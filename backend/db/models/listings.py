@@ -37,3 +37,4 @@ class Listing(Base):
 
     aggregator: Mapped["Aggregator"] = relationship(back_populates="listings")
     notifications: Mapped[list["Notification"]] = relationship(back_populates="listing")
+    sent_listings: Mapped[list["SentListing"]] = relationship(back_populates="listing")

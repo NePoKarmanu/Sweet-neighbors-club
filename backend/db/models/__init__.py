@@ -5,6 +5,7 @@ from .listings import Listing
 from .notification_deliveries import NotificationDelivery
 from .notifications import Notification
 from .search_filters import SearchFilter
+from .sent_listings import SentListing
 from .subscriptions import Subscription
 from .users import User
 
@@ -13,6 +14,7 @@ __all__ = [
     "User",
     "Subscription",
     "SearchFilter",
+    "SentListing",
     "Aggregator",
     "Listing",
     "Notification",
@@ -20,3 +22,4 @@ __all__ = [
     "NotificationChannel",
     "DeliveryStatus",
 ]
+
