@@ -19,6 +19,10 @@ class BaseRepository(Generic[ModelT]):
     def get_by_id(self, entity_id: int) -> ModelT | None:
         return self.session.get(self.model, entity_id)
 
+    def get_one_by(self, **filters: Any) -> ModelT | None:
+        query = select(self.model).filter_by(**filters)
+        return self.session.scalar(query)
+
     def list(self, *, limit: int = 100, offset: int = 0) -> list[ModelT]:
         query = select(self.model).offset(offset).limit(limit)
         return list(self.session.scalars(query))
