@@ -33,3 +33,22 @@ def get_database_url() -> str:
         f"postgresql+psycopg://{quote_plus(db_user)}:{quote_plus(db_password)}"
         f"@{db_host}:{db_port}/{db_name}"
     )
+
+
+def get_jwt_secret_key() -> str:
+    load_env_file()
+
+    secret_key = os.getenv("JWT_SECRET_KEY", "")
+    if not secret_key:
+        raise RuntimeError("JWT_SECRET_KEY is not configured in .env")
+    return secret_key
+
+
+def get_jwt_algorithm() -> str:
+    load_env_file()
+    return os.getenv("JWT_ALGORITHM", "HS256")
+
+
+def get_access_token_expire_minutes() -> int:
+    load_env_file()
+    return int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
