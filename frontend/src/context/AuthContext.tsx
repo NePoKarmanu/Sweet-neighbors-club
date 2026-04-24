@@ -53,11 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [updateAuth]);
 
   const logout = useCallback(() => {
+    if (token) {
+      void apiSignout(token);
+    }
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    apiSignout(token!);
   }, [token]);
 
   const updateProfile = useCallback(async (email: string, phone: string, newPassword: string, currentPassword: string) => {

@@ -36,8 +36,6 @@ const HomePage: React.FC = () => {
   const [error, setError] = useState('');
   const [offset, setOffset] = useState(0);
 
-  const [filters, setFilters] = useState<ListingSearchDTO>({});
-
   const [roomsMin, setRoomsMin] = useState<string>('');
   const [roomsMax, setRoomsMax] = useState<string>('');
   const [priceMin, setPriceMin] = useState<string>('');
@@ -140,7 +138,6 @@ const HomePage: React.FC = () => {
   }, [load, user]);
 
   const applyFilters = () => {
-    setFilters(buildFilters());
     setOffset(0);
   };
 
@@ -154,7 +151,6 @@ const HomePage: React.FC = () => {
     setSelectedCreatorTypes([]);
     setHasRepair(undefined);
     setSelectedLivingConditions([]);
-    setFilters({});
     setOffset(0);
   };
 
