@@ -12,6 +12,13 @@ class SigninRequest(BaseModel):
     password: str = Field(min_length=8, max_length=255)
 
 
+class UpdateProfileRequest(BaseModel):
+    email: str | None = Field(default=None, min_length=3, max_length=255)
+    phone: str | None = Field(default=None, min_length=3, max_length=32)
+    password: str | None = Field(default=None, min_length=8, max_length=255)
+    current_password: str = Field(min_length=8, max_length=255)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
