@@ -7,6 +7,7 @@ from json import JSONDecodeError
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.db.repositories.listings import ListingRepository
 from backend.dto.listings import ListingDataDTO, ListingSearchDTO, ListingSortBy, ListingSortOrder
@@ -73,13 +74,19 @@ def list_listings(
         )
 
     search_dto = _parse_search(search)
-    items, total = ListingRepository(db).list_with_filters(
-        limit=limit,
-        offset=offset,
-        search=search_dto,
-        sort_by=sort_by,
-        sort_order=sort_order,
-    )
+    try:
+        items, total = ListingRepository(db).list_with_filters(
+            limit=limit,
+            offset=offset,
+            search=search_dto,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Listings service is temporarily unavailable",
+        ) from exc
 
     response_items = [
         ListingItemResponse(

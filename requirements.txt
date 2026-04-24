@@ -7,3 +7,6 @@ python-dotenv
 PyJWT
 pydantic
 pydantic-settings
+
+# Frontend dependencies are managed by npm (see frontend/package.json and package-lock.json).
+# Install frontend deps with: npm ci --prefix frontend
