@@ -1,14 +1,16 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 
-@dataclass(slots=True)
-class SignupDTO:
+class SignupDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: str
     phone: str
     password: str
 
 
-@dataclass(slots=True)
-class SigninDTO:
+class SigninDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email: str
     password: str
