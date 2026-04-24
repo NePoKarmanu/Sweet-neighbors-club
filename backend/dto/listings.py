@@ -5,6 +5,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+ListingSortBy = Literal["published_at", "price"]
+ListingSortOrder = Literal["asc", "desc"]
+
+
 class RangeDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

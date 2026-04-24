@@ -1,5 +1,5 @@
 from .auth import SigninDTO, SignupDTO
-from .listings import ListingDataDTO, ListingSearchDTO, RangeDTO
+from .listings import ListingDataDTO, ListingSearchDTO, ListingSortBy, ListingSortOrder, RangeDTO
 
 __all__ = [
     "SignupDTO",
@@ -7,4 +7,6 @@ __all__ = [
     "RangeDTO",
     "ListingSearchDTO",
     "ListingDataDTO",
+    "ListingSortBy",
+    "ListingSortOrder",
 ]

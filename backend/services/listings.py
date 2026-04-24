@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from backend.db.repositories.listings import ListingRepository
-from backend.dto.listings import ListingDataDTO, ListingSearchDTO
+from backend.dto.listings import ListingDataDTO, ListingSearchDTO, ListingSortBy, ListingSortOrder
 from backend.schemas.listings import ListingDataResponse, ListingItemResponse, ListingListResponse
 
 
@@ -63,9 +63,23 @@ def list_listings(
     limit: int,
     offset: int,
     search: str | None,
+    sort_by: ListingSortBy | None,
+    sort_order: ListingSortOrder | None,
 ) -> ListingListResponse:
+    if (sort_by is None) != (sort_order is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Both 'sort_by' and 'sort_order' must be provided together",
+        )
+
     search_dto = _parse_search(search)
-    items, total = ListingRepository(db).list_with_filters(limit=limit, offset=offset, search=search_dto)
+    items, total = ListingRepository(db).list_with_filters(
+        limit=limit,
+        offset=offset,
+        search=search_dto,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
     response_items = [
         ListingItemResponse(

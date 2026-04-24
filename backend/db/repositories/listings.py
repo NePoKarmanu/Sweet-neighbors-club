@@ -3,13 +3,31 @@ from __future__ import annotations
 from sqlalchemy import Boolean, Integer, cast, func, select
 from sqlalchemy.sql import Select
 
-from backend.dto.listings import ListingSearchDTO
+from backend.dto.listings import ListingSearchDTO, ListingSortBy, ListingSortOrder
 from backend.db.models.listings import Listing
 from backend.db.repositories.base import BaseRepository
 
 
 class ListingRepository(BaseRepository[Listing]):
     model = Listing
+
+    def _build_ordering(
+        self,
+        *,
+        sort_by: ListingSortBy | None,
+        sort_order: ListingSortOrder | None,
+    ):
+        if sort_by is None or sort_order is None:
+            return Listing.published_at.desc().nullslast(), Listing.id.desc()
+
+        if sort_by == "price":
+            field = Listing.price
+        else:
+            field = Listing.published_at
+
+        if sort_order == "asc":
+            return field.asc().nullslast(), Listing.id.desc()
+        return field.desc().nullslast(), Listing.id.desc()
 
     def _apply_filters(
         self,
@@ -70,13 +88,16 @@ class ListingRepository(BaseRepository[Listing]):
         limit: int,
         offset: int,
         search: ListingSearchDTO,
+        sort_by: ListingSortBy | None,
+        sort_order: ListingSortOrder | None,
     ) -> tuple[list[Listing], int]:
         base_query = self._apply_filters(select(Listing), search)
         total_query = self._apply_filters(select(func.count(Listing.id)), search)
         total = self.session.scalar(total_query) or 0
 
+        order_by = self._build_ordering(sort_by=sort_by, sort_order=sort_order)
         items_query = (
-            base_query.order_by(Listing.published_at.desc().nullslast(), Listing.id.desc())
+            base_query.order_by(*order_by)
             .offset(offset)
             .limit(limit)
         )
