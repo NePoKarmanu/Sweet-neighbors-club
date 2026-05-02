@@ -7,6 +7,7 @@ from .auth import (
     UserResponse,
 )
 from .listings import ListingItemResponse, ListingListResponse
+from .scraping import ScrapingRunResponse, ScrapingTaskStatusResponse
 
 __all__ = [
     "SignupRequest",
@@ -17,4 +18,6 @@ __all__ = [
     "MessageResponse",
     "ListingItemResponse",
     "ListingListResponse",
+    "ScrapingRunResponse",
+    "ScrapingTaskStatusResponse",
 ]
