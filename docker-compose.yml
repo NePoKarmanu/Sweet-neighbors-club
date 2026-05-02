@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snc-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sweet_neighbors_club}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-sweet_neighbors_club}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: snc-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: snc-backend
+    command: ["/app/backend/docker/start-api.sh"]
+    environment: &backend_env
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/sweet_neighbors_club}
+      REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${APP_CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${APP_CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      SCRAPING_BEAT_ENABLED: ${SCRAPING_BEAT_ENABLED:-true}
+      SCRAPING_INTERVAL_MINUTES: ${SCRAPING_INTERVAL_MINUTES:-10}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: snc-celery-worker
+    command: ["/app/backend/docker/start-worker.sh"]
+    environment: *backend_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: snc-celery-beat
+    command: ["/app/backend/docker/start-beat.sh"]
+    environment: *backend_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    container_name: snc-frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  redis_data:
