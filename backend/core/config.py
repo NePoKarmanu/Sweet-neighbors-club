@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     )
     CIAN_REQUEST_TIMEOUT_SECONDS: int = 20
     CIAN_COOKIE: str | None = None
+    CIAN_USER_AGENT: str | None = None
     SCRAPING_BEAT_ENABLED: bool = True
     SCRAPING_INTERVAL_MINUTES: int = 10
+    SCRAPER_STALE_MISSES_THRESHOLD: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

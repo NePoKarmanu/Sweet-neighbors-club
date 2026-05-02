@@ -23,10 +23,12 @@ class CianScraper:
         search_url: str | None = None,
         timeout_seconds: int | None = None,
         cookie: str | None = None,
+        user_agent: str | None = None,
     ) -> None:
         self.search_url = search_url or settings.CIAN_SEARCH_URL
         self.timeout_seconds = timeout_seconds or settings.CIAN_REQUEST_TIMEOUT_SECONDS
         self.cookie = cookie if cookie is not None else settings.CIAN_COOKIE
+        self.user_agent = user_agent if user_agent is not None else settings.CIAN_USER_AGENT
 
     def scrape(self) -> list[ScrapedListingDTO]:
         headers = self._build_headers()
@@ -87,6 +89,8 @@ class CianScraper:
         }
         if self.cookie:
             headers["Cookie"] = self.cookie
+        if self.user_agent:
+            headers["User-Agent"] = self.user_agent
         return headers
 
     def _parse_offer(

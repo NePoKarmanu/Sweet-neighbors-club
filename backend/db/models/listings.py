@@ -32,6 +32,7 @@ class Listing(Base):
     floor: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    missing_runs_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
