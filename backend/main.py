@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from backend.core.middleware import setup_middlewares
-from backend.routers import auth_router, listing_router
+from backend.routers import auth_router, listing_router, scraping_router
 
 
 def create_app() -> FastAPI:
@@ -16,6 +16,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(listing_router)
+    app.include_router(scraping_router)
     app.include_router(auth_router)
 
     return app

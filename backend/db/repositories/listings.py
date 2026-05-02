@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any, Iterable
+
 from sqlalchemy import Boolean, Integer, cast, func, select
 from sqlalchemy.sql import Select
 
 from backend.dto.listings import ListingSearchDTO, ListingSortBy, ListingSortOrder
 from backend.db.models.listings import Listing
 from backend.db.repositories.base import BaseRepository
+
+
+@dataclass(frozen=True)
+class ListingUpsertResult:
+    created: int
+    updated: int
 
 
 class ListingRepository(BaseRepository[Listing]):
@@ -103,3 +112,46 @@ class ListingRepository(BaseRepository[Listing]):
         )
         items = list(self.session.scalars(items_query))
         return items, total
+
+    def upsert_many(
+        self,
+        *,
+        aggregator_id: int,
+        listings: Iterable[dict[str, Any]],
+    ) -> ListingUpsertResult:
+        payloads_by_external_id = {
+            str(item["external_id"]): item for item in listings
+        }
+        payloads = list(payloads_by_external_id.values())
+        if not payloads:
+            return ListingUpsertResult(created=0, updated=0)
+
+        external_ids = list(payloads_by_external_id)
+        existing_query = select(Listing).where(
+            Listing.aggregator_id == aggregator_id,
+            Listing.external_id.in_(external_ids),
+        )
+        existing_by_external_id = {
+            listing.external_id: listing for listing in self.session.scalars(existing_query)
+        }
+
+        created = 0
+        updated = 0
+        for payload in payloads:
+            external_id = str(payload["external_id"])
+            data = dict(payload)
+            data["aggregator_id"] = aggregator_id
+            data["external_id"] = external_id
+
+            listing = existing_by_external_id.get(external_id)
+            if listing is None:
+                self.session.add(Listing(**data))
+                created += 1
+                continue
+
+            for field, value in data.items():
+                setattr(listing, field, value)
+            updated += 1
+
+        self.session.commit()
+        return ListingUpsertResult(created=created, updated=updated)
