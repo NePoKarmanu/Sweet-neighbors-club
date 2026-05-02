@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,6 +11,9 @@ from .base import Base
 
 class Listing(Base):
     __tablename__ = "listings"
+    __table_args__ = (
+        UniqueConstraint("aggregator_id", "external_id", name="uq_listings_aggregator_external_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
