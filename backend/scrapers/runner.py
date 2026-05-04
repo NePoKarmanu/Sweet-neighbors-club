@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from backend.core.config import settings
 from backend.db.repositories.aggregators import AggregatorRepository
 from backend.db.repositories.listings import ListingRepository
 from backend.scrapers.registry import load_scrapers
@@ -49,6 +50,7 @@ def run_all_scrapers(
             result = listing_repository.upsert_many(
                 aggregator_id=aggregator.id,
                 listings=payloads,
+                stale_misses_threshold=settings.SCRAPER_STALE_MISSES_THRESHOLD,
             )
             created += result.created
             updated += result.updated

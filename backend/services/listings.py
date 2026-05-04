@@ -4,13 +4,13 @@ import json
 from decimal import Decimal
 from json import JSONDecodeError
 
-from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.db.repositories.listings import ListingRepository
 from backend.dto.listings import ListingDataDTO, ListingSearchDTO, ListingSortBy, ListingSortOrder
+from backend.exceptions import ExternalServiceAppError, ValidationAppError
 from backend.schemas.listings import ListingDataResponse, ListingItemResponse, ListingListResponse
 
 
@@ -29,24 +29,15 @@ def _parse_search(search: str | None) -> ListingSearchDTO:
     try:
         payload = json.loads(search)
     except JSONDecodeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Query parameter 'search' must be a valid JSON object",
-        ) from exc
+        raise ValidationAppError("Query parameter 'search' must be a valid JSON object") from exc
 
     if not isinstance(payload, dict):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Query parameter 'search' must be a JSON object",
-        )
+        raise ValidationAppError("Query parameter 'search' must be a JSON object")
 
     try:
         return ListingSearchDTO.model_validate(payload)
     except ValidationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=exc.errors(),
-        ) from exc
+        raise ValidationAppError(str(exc)) from exc
 
 
 def _normalize_listing_data(raw_data: dict | None) -> ListingDataResponse:
@@ -68,10 +59,7 @@ def list_listings(
     sort_order: ListingSortOrder | None,
 ) -> ListingListResponse:
     if (sort_by is None) != (sort_order is None):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Both 'sort_by' and 'sort_order' must be provided together",
-        )
+        raise ValidationAppError("Both 'sort_by' and 'sort_order' must be provided together")
 
     search_dto = _parse_search(search)
     try:
@@ -83,10 +71,7 @@ def list_listings(
             sort_order=sort_order,
         )
     except SQLAlchemyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Listings service is temporarily unavailable",
-        ) from exc
+        raise ExternalServiceAppError("Listings service is temporarily unavailable") from exc
 
     response_items = [
         ListingItemResponse(

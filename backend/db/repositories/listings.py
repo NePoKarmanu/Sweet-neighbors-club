@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import Boolean, Integer, cast, func, select
 from sqlalchemy.sql import Select
@@ -19,6 +21,13 @@ class ListingUpsertResult:
 
 class ListingRepository(BaseRepository[Listing]):
     model = Listing
+
+    def get_by_ids(self, *, listing_ids: Iterable[int]) -> list[Listing]:
+        ids = list(listing_ids)
+        if not ids:
+            return []
+        query = select(Listing).where(Listing.id.in_(ids))
+        return list(self.session.scalars(query))
 
     def _build_ordering(
         self,
@@ -113,23 +122,33 @@ class ListingRepository(BaseRepository[Listing]):
         items = list(self.session.scalars(items_query))
         return items, total
 
+    def list_recent_active(self, *, limit: int) -> list[Listing]:
+        query = (
+            select(Listing)
+            .where(Listing.deleted_at.is_(None))
+            .order_by(Listing.id.desc())
+            .limit(limit)
+        )
+        return list(self.session.scalars(query))
+
     def upsert_many(
         self,
         *,
         aggregator_id: int,
         listings: Iterable[dict[str, Any]],
+        stale_misses_threshold: int,
     ) -> ListingUpsertResult:
+        threshold = max(1, stale_misses_threshold)
+        now = datetime.now(timezone.utc)
         payloads_by_external_id = {
             str(item["external_id"]): item for item in listings
         }
         payloads = list(payloads_by_external_id.values())
-        if not payloads:
-            return ListingUpsertResult(created=0, updated=0)
+        incoming_external_ids = list(payloads_by_external_id)
 
-        external_ids = list(payloads_by_external_id)
         existing_query = select(Listing).where(
             Listing.aggregator_id == aggregator_id,
-            Listing.external_id.in_(external_ids),
+            Listing.external_id.in_(incoming_external_ids),
         )
         existing_by_external_id = {
             listing.external_id: listing for listing in self.session.scalars(existing_query)
@@ -142,6 +161,9 @@ class ListingRepository(BaseRepository[Listing]):
             data = dict(payload)
             data["aggregator_id"] = aggregator_id
             data["external_id"] = external_id
+            data["parsed_at"] = data.get("parsed_at") or now
+            data["deleted_at"] = None
+            data["missing_runs_count"] = 0
 
             listing = existing_by_external_id.get(external_id)
             if listing is None:
@@ -152,6 +174,16 @@ class ListingRepository(BaseRepository[Listing]):
             for field, value in data.items():
                 setattr(listing, field, value)
             updated += 1
+
+        stale_query = select(Listing).where(Listing.aggregator_id == aggregator_id)
+        if incoming_external_ids:
+            stale_query = stale_query.where(Listing.external_id.not_in(incoming_external_ids))
+
+        stale_listings = list(self.session.scalars(stale_query))
+        for stale_listing in stale_listings:
+            stale_listing.missing_runs_count += 1
+            if stale_listing.missing_runs_count >= threshold:
+                stale_listing.deleted_at = now
 
         self.session.commit()
         return ListingUpsertResult(created=created, updated=updated)

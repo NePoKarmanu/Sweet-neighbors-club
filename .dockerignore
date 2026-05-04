@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache
+.ruff_cache
+tmp
+frontend/node_modules
+frontend/dist
+backend/**/__pycache__
+backend/**/*.pyc
+docker_data

@@ -10,6 +10,8 @@ pydantic-settings
 httpx
 celery
 redis
+pywebpush
+passlib[argon2]
 
 # Frontend dependencies are managed by npm (see frontend/package.json and package-lock.json).
 # Install frontend deps with: npm ci --prefix frontend

@@ -19,3 +19,6 @@ __all__ = [
     "NotificationRepository",
     "NotificationDeliveryRepository",
 ]
+from .push_subscriptions import PushSubscriptionRepository
+
+__all__ = ["PushSubscriptionRepository"]

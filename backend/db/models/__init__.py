@@ -4,6 +4,7 @@ from .enums import DeliveryStatus, NotificationChannel
 from .listings import Listing
 from .notification_deliveries import NotificationDelivery
 from .notifications import Notification
+from .push_subscriptions import PushSubscription
 from .search_filters import SearchFilter
 from .sent_listings import SentListing
 from .subscriptions import Subscription
@@ -18,6 +19,7 @@ __all__ = [
     "Aggregator",
     "Listing",
     "Notification",
+    "PushSubscription",
     "NotificationDelivery",
     "NotificationChannel",
     "DeliveryStatus",

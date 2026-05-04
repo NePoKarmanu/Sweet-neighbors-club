@@ -26,12 +26,14 @@ class Listing(Base):
     parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     title: Mapped[str] = mapped_column(String(512), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True)
     price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     rooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     area: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     floor: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    missing_runs_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

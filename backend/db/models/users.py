@@ -28,3 +28,4 @@ class User(Base):
     subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="user")
     notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
     sent_listings: Mapped[list["SentListing"]] = relationship(back_populates="user")
+    push_subscriptions: Mapped[list["PushSubscription"]] = relationship(back_populates="user")
