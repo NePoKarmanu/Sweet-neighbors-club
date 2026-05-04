@@ -114,6 +114,15 @@ class ListingRepository(BaseRepository[Listing]):
         items = list(self.session.scalars(items_query))
         return items, total
 
+    def list_recent_active(self, *, limit: int) -> list[Listing]:
+        query = (
+            select(Listing)
+            .where(Listing.deleted_at.is_(None))
+            .order_by(Listing.id.desc())
+            .limit(limit)
+        )
+        return list(self.session.scalars(query))
+
     def upsert_many(
         self,
         *,

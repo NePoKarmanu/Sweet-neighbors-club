@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-COPY . /app
+COPY alembic.ini /app/alembic.ini
+COPY backend /app/backend
 
 RUN chmod +x /app/backend/docker/start-api.sh /app/backend/docker/start-worker.sh /app/backend/docker/start-beat.sh

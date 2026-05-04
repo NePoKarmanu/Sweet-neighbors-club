@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from backend.core.celery_app import celery_app
 from backend.db.models.users import User
+from backend.exceptions import ForbiddenAppError, NotFoundAppError, ValidationAppError
 from backend.schemas.scraping import ScrapingRunResponse, ScrapingTaskStatusResponse
 from backend.scrapers.base import ScraperProviderNotFoundError
 from backend.scrapers.registry import list_provider_names, load_scrapers
@@ -16,10 +17,7 @@ router = APIRouter(prefix="/scraping", tags=["scraping"])
 
 def _require_staff(current_user: User) -> None:
     if not current_user.is_staff:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Staff access is required",
-        )
+        raise ForbiddenAppError("Staff access is required")
 
 
 def _normalize_provider(provider: str | None) -> str | None:
@@ -27,10 +25,7 @@ def _normalize_provider(provider: str | None) -> str | None:
         return None
     normalized = provider.strip().lower()
     if not normalized:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Query parameter 'provider' cannot be empty",
-        )
+        raise ValidationAppError("Query parameter 'provider' cannot be empty")
     return normalized
 
 
@@ -41,12 +36,9 @@ def _validate_provider(provider: str | None) -> None:
         load_scrapers(provider_name=provider)
     except ScraperProviderNotFoundError as exc:
         providers = list_provider_names()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": str(exc),
-                "available_providers": providers,
-            },
+        raise ValidationAppError(
+            str(exc),
+            meta={"available_providers": providers},
         ) from exc
 
 
@@ -87,6 +79,8 @@ def get_scraping_task_status(
 ) -> ScrapingTaskStatusResponse:
     _require_staff(current_user)
     result = AsyncResult(task_id, app=celery_app)
+    if result.state == "PENDING":
+        raise NotFoundAppError("Task not found")
     payload = result.result if isinstance(result.result, dict) else None
     return ScrapingTaskStatusResponse(
         task_id=task_id,

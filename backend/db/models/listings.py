@@ -26,6 +26,7 @@ class Listing(Base):
     parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     title: Mapped[str] = mapped_column(String(512), nullable=False)
+    city: Mapped[str | None] = mapped_column(String(128), nullable=True)
     price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     rooms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     area: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)

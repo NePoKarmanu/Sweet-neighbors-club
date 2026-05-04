@@ -12,13 +12,14 @@ celery_app = Celery(
     "sweet_neighbors_club",
     broker=broker_url,
     backend=result_backend,
-    include=["backend.tasks.scraping"],
+    include=["backend.tasks.scraping", "backend.tasks.notifications"],
 )
 
 celery_app.conf.update(
     accept_content=["json"],
     task_serializer="json",
     result_serializer="json",
+    result_expires=settings.CELERY_RESULT_EXPIRES_SECONDS,
     timezone="Europe/Moscow",
     enable_utc=True,
 )
@@ -29,5 +30,17 @@ if settings.SCRAPING_BEAT_ENABLED:
             "task": "scraping.run_all_scrapers_task",
             "schedule": crontab(minute=f"*/{settings.SCRAPING_INTERVAL_MINUTES}"),
             "args": (None,),
-        }
+        },
+        "match-listings-to-subscriptions-every-10-minutes": {
+            "task": "notifications.match_listings_task",
+            "schedule": crontab(minute=f"*/{settings.SCRAPING_INTERVAL_MINUTES}"),
+        },
+        "materialize-deliveries-every-10-minutes": {
+            "task": "notifications.materialize_deliveries_task",
+            "schedule": crontab(minute=f"*/{settings.SCRAPING_INTERVAL_MINUTES}"),
+        },
+        "process-deliveries-every-10-minutes": {
+            "task": "notifications.process_deliveries_task",
+            "schedule": crontab(minute=f"*/{settings.SCRAPING_INTERVAL_MINUTES}"),
+        },
     }

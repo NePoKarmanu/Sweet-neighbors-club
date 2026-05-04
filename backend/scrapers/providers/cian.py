@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from html import unescape
 from typing import Any
 from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 import httpx
 
@@ -109,6 +110,7 @@ class CianScraper:
 
         absolute_url = urljoin(self.base_url, url)
         title = _to_string(_first_deep_value(offer, ("title", "subtitle", "header")))
+        city = _extract_city(offer, base_url=self.base_url)
         return ScrapedListingDTO(
             external_id=external_id,
             url=absolute_url,
@@ -117,14 +119,13 @@ class CianScraper:
             ),
             parsed_at=parsed_at,
             title=title or f"Cian listing {external_id}",
+            city=city,
             price=_to_float(_first_deep_value(offer, ("price", "priceRur", "totalPrice"))),
             rooms=_to_int(_first_deep_value(offer, ("rooms", "roomsCount", "roomCount"))),
             area=_to_float(_first_deep_value(offer, ("totalArea", "area", "allArea"))),
             floor=_to_int(_first_deep_value(offer, ("floor", "floorNumber"))),
             data={
-                "creator_type": _normalize_creator_type(
-                    _first_deep_value(offer, ("creator_type", "creatorType", "sellerType", "userType"))
-                ),
+                "creator_type": _extract_creator_type(offer),
                 "build_year": _to_int(_first_deep_value(offer, ("buildYear", "build_year"))),
                 "has_repair": _to_bool(_first_deep_value(offer, ("hasRepair", "has_repair", "repair"))),
                 "property_type": _to_string(
@@ -133,7 +134,6 @@ class CianScraper:
                 "living_conditions": _to_string_list(
                     _first_deep_value(offer, ("livingConditions", "living_conditions"))
                 ),
-                "source_payload": offer,
             },
         )
 
@@ -392,6 +392,55 @@ def _normalize_creator_type(value: Any) -> str | None:
         return "owner"
     if lowered in {"agency", "agent", "realtor", "developer"}:
         return "agency"
+    return None
+
+
+def _extract_creator_type(offer: dict[str, Any]) -> str | None:
+    is_by_homeowner = _first_deep_value(offer, ("isByHomeowner",))
+    if isinstance(is_by_homeowner, bool):
+        return "owner" if is_by_homeowner else "agency"
+
+    user = offer.get("user")
+    if isinstance(user, dict):
+        is_agent = user.get("isAgent")
+        if isinstance(is_agent, bool):
+            return "agency" if is_agent else "owner"
+
+        from_user_type = _normalize_creator_type(user.get("userType"))
+        if from_user_type is not None:
+            return from_user_type
+
+        if _to_string(user.get("agencyName")) is not None:
+            return "agency"
+
+    ga_label = _to_string(_first_deep_value(offer, ("gaLabel",)))
+    if ga_label:
+        lowered = ga_label.lower()
+        if "owner=1" in lowered:
+            return "owner"
+        if "owner=0" in lowered or "spec=agent" in lowered or "spec=company" in lowered:
+            return "agency"
+
+    return _normalize_creator_type(
+        _first_deep_value(offer, ("creator_type", "creatorType", "sellerType", "userType"))
+    )
+
+
+def _extract_city(offer: dict[str, Any], *, base_url: str) -> str | None:
+    city = _to_string(
+        _first_deep_value(
+            offer,
+            ("city", "cityName", "settlementName", "localityName", "regionName"),
+        )
+    )
+    if city is not None:
+        return city
+
+    host = urlparse(base_url).hostname or ""
+    if host.endswith(".cian.ru"):
+        slug = host.split(".")[0]
+        if slug:
+            return slug.replace("-", " ").strip().title()
     return None
 
 

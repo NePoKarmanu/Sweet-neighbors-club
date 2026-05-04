@@ -22,6 +22,7 @@ class ScrapedListingDTO:
     external_id: str
     url: str
     title: str
+    city: str | None = None
     published_at: datetime | None = None
     parsed_at: datetime | None = None
     price: float | None = None
@@ -37,6 +38,7 @@ class ScrapedListingDTO:
             "published_at": self.published_at,
             "parsed_at": self.parsed_at,
             "title": self.title,
+            "city": self.city,
             "price": self.price,
             "rooms": self.rooms,
             "area": self.area,

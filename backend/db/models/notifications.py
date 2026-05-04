@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, func
+from sqlalchemy import DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -10,6 +10,7 @@ from .base import Base
 
 class Notification(Base):
     __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("user_id", "listing_id", name="uq_notifications_user_listing"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 

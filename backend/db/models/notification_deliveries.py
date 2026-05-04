@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -11,6 +11,9 @@ from .enums import DeliveryStatus, NotificationChannel
 
 class NotificationDelivery(Base):
     __tablename__ = "notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "channel", name="uq_notification_deliveries_notification_channel"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 

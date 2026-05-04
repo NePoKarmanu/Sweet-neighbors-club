@@ -10,6 +10,7 @@ pydantic-settings
 httpx
 celery
 redis
+pywebpush
 
 # Frontend dependencies are managed by npm (see frontend/package.json and package-lock.json).
 # Install frontend deps with: npm ci --prefix frontend
