@@ -176,8 +176,23 @@ def process_pending_deliveries(
     now = datetime.now(timezone.utc)
     grouped_deliveries: dict[tuple[int, NotificationChannel], list[Any]] = defaultdict(list)
     pending_changes = 0
+
+    notification_ids = {delivery.notification_id for delivery in deliveries}
+    notifications = notification_repository.get_by_ids(notification_ids=notification_ids)
+    notifications_by_id = {notification.id: notification for notification in notifications}
+    listing_ids = {notification.listing_id for notification in notifications}
+    listings = listing_repository.get_by_ids(listing_ids=listing_ids)
+    listings_by_id = {listing.id: listing for listing in listings}
+    user_ids = {notification.user_id for notification in notifications}
+    users = user_repository.get_by_ids(user_ids=user_ids)
+    users_by_id = {user.id: user for user in users}
+    active_push_subscriptions = push_repository.list_active_by_user_ids(user_ids=user_ids)
+    active_push_subscriptions_by_user_id: dict[int, Any] = {}
+    for subscription in active_push_subscriptions:
+        active_push_subscriptions_by_user_id.setdefault(subscription.user_id, subscription)
+
     for delivery in deliveries:
-        notification = notification_repository.get_by_id(delivery.notification_id)
+        notification = notifications_by_id.get(delivery.notification_id)
         if notification is None:
             delivery_repository.mark_failed(delivery=delivery, error_message="Notification is missing")
             processed += 1
@@ -189,7 +204,7 @@ def process_pending_deliveries(
 
     for (target_user_id, channel), group in grouped_deliveries.items():
         try:
-            user = user_repository.get_by_id(target_user_id)
+            user = users_by_id.get(target_user_id)
             if user is None:
                 for delivery, _ in group:
                     delivery_repository.mark_failed(delivery=delivery, error_message="User is missing")

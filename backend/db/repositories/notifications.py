@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from sqlalchemy import select
 
 from backend.db.models.notifications import Notification
@@ -8,6 +10,13 @@ from backend.db.repositories.base import BaseRepository
 
 class NotificationRepository(BaseRepository[Notification]):
     model = Notification
+
+    def get_by_ids(self, *, notification_ids: Iterable[int]) -> list[Notification]:
+        ids = list(notification_ids)
+        if not ids:
+            return []
+        query = select(Notification).where(Notification.id.in_(ids))
+        return list(self.session.scalars(query))
 
     def create_if_missing(self, *, user_id: int, listing_id: int) -> Notification | None:
         query = select(Notification).where(

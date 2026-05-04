@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 from sqlalchemy import Boolean, Integer, cast, func, select
 from sqlalchemy.sql import Select
@@ -20,6 +21,13 @@ class ListingUpsertResult:
 
 class ListingRepository(BaseRepository[Listing]):
     model = Listing
+
+    def get_by_ids(self, *, listing_ids: Iterable[int]) -> list[Listing]:
+        ids = list(listing_ids)
+        if not ids:
+            return []
+        query = select(Listing).where(Listing.id.in_(ids))
+        return list(self.session.scalars(query))
 
     def _build_ordering(
         self,
