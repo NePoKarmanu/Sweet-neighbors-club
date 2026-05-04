@@ -23,8 +23,8 @@ class PushSender:
         first_url = listings[0][1]
         payload = json.dumps(
             {
-                "title": "New apartments found",
-                "body": f"{len(listings)} new listings are available",
+                "title": "Новые объявления найдены для Вас!",
+                "body": f"{len(listings)} новых объявлений доступно",
                 "url": first_url,
                 "urls": [url for _, url, _ in listings],
             }
