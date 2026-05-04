@@ -18,7 +18,7 @@ class NotificationRepository(BaseRepository[Notification]):
         if entity is None:
             entity = Notification(user_id=user_id, listing_id=listing_id)
             self.session.add(entity)
-            self.session.commit()
+            self.session.flush()
             self.session.refresh(entity)
             return entity
         return None

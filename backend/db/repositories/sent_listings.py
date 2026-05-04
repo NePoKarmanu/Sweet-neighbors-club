@@ -20,6 +20,6 @@ class SentListingRepository(BaseRepository[SentListing]):
         if entity is None:
             entity = SentListing(user_id=user_id, listing_id=listing_id, sent_at=sent_at)
             self.session.add(entity)
-            self.session.commit()
+            self.session.flush()
             self.session.refresh(entity)
         return entity

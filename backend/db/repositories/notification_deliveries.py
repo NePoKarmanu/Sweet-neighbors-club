@@ -59,17 +59,13 @@ class NotificationDeliveryRepository(BaseRepository[NotificationDelivery]):
                 )
             )
             created += 1
-        if created:
-            self.session.commit()
         return created
 
     def mark_sent(self, *, delivery: NotificationDelivery, sent_at: datetime) -> None:
         delivery.status = DeliveryStatus.sent
         delivery.sent_at = sent_at
         delivery.error_message = None
-        self.session.commit()
 
     def mark_failed(self, *, delivery: NotificationDelivery, error_message: str) -> None:
         delivery.status = DeliveryStatus.failed
         delivery.error_message = error_message
-        self.session.commit()

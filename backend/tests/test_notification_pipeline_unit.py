@@ -168,6 +168,89 @@ class NotificationPipelineUnitTests(unittest.TestCase):
             include_email=True,
             include_push=False,
         )
+    
+    def test_process_pending_deliveries_large_batch_commits_in_chunks(self) -> None:
+        db = MagicMock()
+        deliveries = [SimpleNamespace(notification_id=i, channel=NotificationChannel.email) for i in range(1, 121)]
+
+        with (
+            patch("backend.services.notification_pipeline.NotificationDeliveryRepository") as delivery_repo_cls,
+            patch("backend.services.notification_pipeline.NotificationRepository") as notification_repo_cls,
+            patch("backend.services.notification_pipeline.ListingRepository") as listing_repo_cls,
+            patch("backend.services.notification_pipeline.UserRepository") as user_repo_cls,
+            patch("backend.services.notification_pipeline.PushSubscriptionRepository"),
+            patch("backend.services.notification_pipeline.SentListingRepository") as sent_repo_cls,
+            patch("backend.services.notification_pipeline.EmailSender"),
+            patch("backend.services.notification_pipeline.PushSender"),
+        ):
+            delivery_repo = delivery_repo_cls.return_value
+            notification_repo = notification_repo_cls.return_value
+            listing_repo = listing_repo_cls.return_value
+            user_repo = user_repo_cls.return_value
+            sent_repo = sent_repo_cls.return_value
+
+            delivery_repo.list_pending.return_value = deliveries
+            notification_repo.get_by_id.side_effect = [
+                SimpleNamespace(listing_id=i, user_id=1) for i in range(1, 121)
+            ]
+            listing_repo.get_by_id.side_effect = [
+                SimpleNamespace(id=i, title=f"Listing {i}", url=f"http://example.com/{i}", price=1000 + i)
+                for i in range(1, 121)
+            ]
+            user_repo.get_by_id.return_value = SimpleNamespace(id=1, email="user@example.com")
+
+            processed = notification_pipeline.process_pending_deliveries(db, batch_size=200)
+
+        self.assertEqual(processed, 120)
+        self.assertEqual(delivery_repo.mark_sent.call_count, 120)
+        self.assertEqual(delivery_repo.commit.call_count, 2)
+        self.assertEqual(delivery_repo.flush.call_count, 2)
+        self.assertEqual(sent_repo.create_if_missing.call_count, 120)
+
+    def test_process_pending_deliveries_partial_failure_keeps_failed_and_continues(self) -> None:
+        db = MagicMock()
+        deliveries = [
+            SimpleNamespace(notification_id=1, channel=NotificationChannel.email),
+            SimpleNamespace(notification_id=2, channel=NotificationChannel.email),
+        ]
+
+        with (
+            patch("backend.services.notification_pipeline.NotificationDeliveryRepository") as delivery_repo_cls,
+            patch("backend.services.notification_pipeline.NotificationRepository") as notification_repo_cls,
+            patch("backend.services.notification_pipeline.ListingRepository") as listing_repo_cls,
+            patch("backend.services.notification_pipeline.UserRepository") as user_repo_cls,
+            patch("backend.services.notification_pipeline.PushSubscriptionRepository"),
+            patch("backend.services.notification_pipeline.SentListingRepository"),
+            patch("backend.services.notification_pipeline.EmailSender") as email_sender_cls,
+            patch("backend.services.notification_pipeline.PushSender"),
+        ):
+            delivery_repo = delivery_repo_cls.return_value
+            notification_repo = notification_repo_cls.return_value
+            listing_repo = listing_repo_cls.return_value
+            user_repo = user_repo_cls.return_value
+            email_sender = email_sender_cls.return_value
+
+            delivery_repo.list_pending.return_value = deliveries
+            notification_repo.get_by_id.side_effect = [
+                SimpleNamespace(listing_id=101, user_id=1),
+                SimpleNamespace(listing_id=202, user_id=2),
+            ]
+            listing_repo.get_by_id.side_effect = [
+                SimpleNamespace(id=101, title="A", url="http://example.com/a", price=100),
+                SimpleNamespace(id=202, title="B", url="http://example.com/b", price=200),
+            ]
+            user_repo.get_by_id.side_effect = [
+                SimpleNamespace(id=1, email="user1@example.com"),
+                SimpleNamespace(id=2, email="user2@example.com"),
+            ]
+            email_sender.send_many.side_effect = [RuntimeError("smtp down"), None]
+
+            processed = notification_pipeline.process_pending_deliveries(db, batch_size=10)
+
+        self.assertEqual(processed, 2)
+        self.assertEqual(delivery_repo.mark_failed.call_count, 1)
+        self.assertEqual(delivery_repo.mark_sent.call_count, 1)
+        delivery_repo.rollback.assert_called_once()
 
 
 if __name__ == "__main__":

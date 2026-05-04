@@ -37,3 +37,13 @@ class BaseRepository(Generic[ModelT]):
     def delete(self, entity: ModelT) -> None:
         self.session.delete(entity)
         self.session.commit()
+
+    def flush(self) -> None:
+        self.session.flush()
+
+    def commit(self) -> None:
+        self.session.commit()
+
+    def rollback(self) -> None:
+        self.session.rollback()
+
