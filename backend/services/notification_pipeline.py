@@ -215,7 +215,7 @@ def process_pending_deliveries(
             listings_payload: list[tuple[str, str, float | None, int]] = []
             failed_delivery: Any | None = None
             for delivery, notification in group:
-                listing = listing_repository.get_by_id(notification.listing_id)
+                listing = listings_by_id.get(notification.listing_id)
                 if listing is None:
                     failed_delivery = delivery
                     break
@@ -242,7 +242,7 @@ def process_pending_deliveries(
                     listings=listing_messages,
                 )
             else:
-                push_subscription = push_repository.get_any_active_for_user(user_id=user.id)
+                push_subscription = active_push_subscriptions_by_user_id.get(user.id)
                 if push_subscription is None:
                     raise RuntimeError("No active push subscription")
                 failed_push_endpoint = push_subscription.endpoint

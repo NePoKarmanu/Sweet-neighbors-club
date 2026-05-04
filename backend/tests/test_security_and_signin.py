@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+import jwt
 
-from backend.dto.auth import SigninDTO
-from backend.services.signin import signin_user
+from backend.dto.auth import RefreshDTO, SigninDTO
+from backend.services.signin import refresh_access_token, signin_user
+from backend.utils import jwt as jwt_utils
 from backend.utils.security import hash_password, verify_password
 
 
@@ -83,3 +85,41 @@ def test_signin_fail_with_wrong_password() -> None:
             pass
     finally:
         signin_module.UserRepository = original_repo
+
+def test_decode_access_token_rejects_refresh_token() -> None:
+    token = jwt_utils.create_refresh_token(user_id=1)
+
+    try:
+        jwt_utils.decode_access_token(token)
+        assert False, "Expected InvalidTokenError"
+    except jwt.InvalidTokenError:
+        pass
+
+
+def test_refresh_access_token_with_expired_access_token() -> None:
+    refresh_token = jwt_utils.create_refresh_token(user_id=7)
+
+    from backend.utils.jwt import JWT_ALGORITHM, JWT_SECRET
+    from datetime import UTC, datetime, timedelta
+
+    expired_access = jwt.encode(
+        {
+            "sub": "7",
+            "type": "access",
+            "exp": datetime.now(UTC) - timedelta(minutes=1),
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    try:
+        jwt_utils.decode_access_token(expired_access)
+        assert False, "Expected ExpiredSignatureError"
+    except jwt.ExpiredSignatureError:
+        pass
+
+    response = refresh_access_token(RefreshDTO(refresh_token=refresh_token))
+    payload = jwt_utils.decode_access_token(response.access_token)
+
+    assert payload["sub"] == "7"
+    assert payload["type"] == "access"

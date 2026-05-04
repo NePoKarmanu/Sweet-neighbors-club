@@ -12,6 +12,17 @@ from backend.db.repositories.base import BaseRepository
 class PushSubscriptionRepository(BaseRepository[PushSubscription]):
     model = PushSubscription
 
+    def list_active_by_user_ids(self, *, user_ids: Iterable[int]) -> list[PushSubscription]:
+        ids = list(user_ids)
+        if not ids:
+            return []
+        query = select(PushSubscription).where(
+            PushSubscription.user_id.in_(ids),
+            PushSubscription.is_active.is_(True),
+            PushSubscription.deleted_at.is_(None),
+        )
+        return list(self.session.scalars(query))
+
     def list_active_for_user(self, *, user_id: int) -> list[PushSubscription]:
         query = select(PushSubscription).where(
             PushSubscription.user_id == user_id,
