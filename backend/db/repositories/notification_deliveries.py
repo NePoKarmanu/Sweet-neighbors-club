@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from backend.db.models.enums import DeliveryStatus, NotificationChannel
 from backend.db.models.notification_deliveries import NotificationDelivery
@@ -31,33 +32,33 @@ class NotificationDeliveryRepository(BaseRepository[NotificationDelivery]):
         include_email: bool,
         include_push: bool,
     ) -> int:
-        existing_channels = {
-            row[0]
-            for row in self.session.execute(
-                select(NotificationDelivery.channel).where(
-                    NotificationDelivery.notification_id == notification_id,
-                    NotificationDelivery.deleted_at.is_(None),
-                )
-            ).all()
-        }
+        channels_to_create: list[NotificationChannel] = []
+        if include_email:
+            channels_to_create.append(NotificationChannel.email)
+        if include_push:
+            channels_to_create.append(NotificationChannel.push)
+
+        if not channels_to_create:
+            return 0
+
+        stmt = (
+            insert(NotificationDelivery)
+            .values(
+                [
+                    {
+                        "notification_id": notification_id,
+                        "channel": channel,
+                        "status": DeliveryStatus.pending,
+                    }
+                    for channel in channels_to_create
+                ]
+            )
+            .on_conflict_do_nothing(constraint="uq_notification_deliveries_notification_channel")
+            .returning(NotificationDelivery.id)
+        )
+        inserted_ids = self.session.scalars(stmt)
         created = 0
-        if include_email and NotificationChannel.email not in existing_channels:
-            self.session.add(
-                NotificationDelivery(
-                    notification_id=notification_id,
-                    channel=NotificationChannel.email,
-                    status=DeliveryStatus.pending,
-                )
-            )
-            created += 1
-        if include_push and NotificationChannel.push not in existing_channels:
-            self.session.add(
-                NotificationDelivery(
-                    notification_id=notification_id,
-                    channel=NotificationChannel.push,
-                    status=DeliveryStatus.pending,
-                )
-            )
+        for _ in inserted_ids:
             created += 1
         return created
 

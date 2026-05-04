@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from backend.db.models.notifications import Notification
 from backend.db.repositories.base import BaseRepository
@@ -19,18 +20,16 @@ class NotificationRepository(BaseRepository[Notification]):
         return list(self.session.scalars(query))
 
     def create_if_missing(self, *, user_id: int, listing_id: int) -> Notification | None:
-        query = select(Notification).where(
-            Notification.user_id == user_id,
-            Notification.listing_id == listing_id,
+        stmt = (
+            insert(Notification)
+            .values(user_id=user_id, listing_id=listing_id)
+            .on_conflict_do_nothing(constraint="uq_notifications_user_listing")
+            .returning(Notification.id)
         )
-        entity = self.session.scalar(query)
-        if entity is None:
-            entity = Notification(user_id=user_id, listing_id=listing_id)
-            self.session.add(entity)
-            self.session.flush()
-            self.session.refresh(entity)
-            return entity
-        return None
+        created_notification_id = self.session.scalar(stmt)
+        if created_notification_id is None:
+            return None
+        return self.get_by_id(created_notification_id)
 
     def list_unprocessed(self, *, limit: int) -> list[Notification]:
         query = (
