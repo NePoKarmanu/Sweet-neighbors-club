@@ -9,15 +9,24 @@ from backend.db.models.push_subscriptions import PushSubscription
 
 
 class PushSender:
-    def send(self, *, push_subscription: PushSubscription, title: str, url: str, price: float | None) -> None:
+    def send_many(
+        self,
+        *,
+        push_subscription: PushSubscription,
+        listings: list[tuple[str, str, float | None]],
+    ) -> None:
         if not settings.WEB_PUSH_VAPID_PRIVATE_KEY or not settings.WEB_PUSH_VAPID_CLAIMS_SUBJECT:
             raise RuntimeError("Web push is not configured")
+        if not listings:
+            raise RuntimeError("No listings to send")
 
+        first_url = listings[0][1]
         payload = json.dumps(
             {
-                "title": title,
-                "body": f"Price: {price}",
-                "url": url,
+                "title": "New apartments found",
+                "body": f"{len(listings)} new listings are available",
+                "url": first_url,
+                "urls": [url for _, url, _ in listings],
             }
         )
         webpush(

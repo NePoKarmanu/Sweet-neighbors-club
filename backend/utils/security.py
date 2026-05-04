@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import hashlib
+from passlib.context import CryptContext
+
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return pwd_context.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return hash_password(password) == password_hash
+    return pwd_context.verify(password, password_hash)
+
