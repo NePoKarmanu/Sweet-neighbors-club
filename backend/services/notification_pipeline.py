@@ -21,10 +21,6 @@ from backend.services.deliveries.push_sender import PushSender, WebPushException
 
 
 def _fits_range(value: float | int | None, minimum: float | int | None, maximum: float | int | None) -> bool:
-    """Check value against optional bounds.
-
-    `None` bounds are treated as unbounded limits.
-    """
     if minimum is not None and (value is None or value < minimum):
         return False
     if maximum is not None and (value is None or value > maximum):
@@ -132,9 +128,26 @@ def materialize_pending_deliveries(
     push_repository = PushSubscriptionRepository(db)
 
     notifications = notification_repository.list_unprocessed(limit=batch_size)
-    created = 0
     filters_with_subscriptions = subscription_repository.list_active_with_subscriptions(user_id=user_id)
     subscriptions_by_user = {subscription.user_id: subscription for _, subscription in filters_with_subscriptions}
+    return _materialize_deliveries_for_notifications(
+        notifications=notifications,
+        subscriptions_by_user=subscriptions_by_user,
+        delivery_repository=delivery_repository,
+        push_repository=push_repository,
+        user_id=user_id,
+    )
+
+
+def _materialize_deliveries_for_notifications(
+    *,
+    notifications: list[Any],
+    subscriptions_by_user: dict[int, Any],
+    delivery_repository: NotificationDeliveryRepository,
+    push_repository: PushSubscriptionRepository,
+    user_id: int | None,
+) -> int:
+    created = 0
     for notification in notifications:
         if user_id is not None and notification.user_id != user_id:
             continue
@@ -172,106 +185,41 @@ def process_pending_deliveries(
     if not deliveries:
         return 0
 
-    processed = 0
     now = datetime.now(timezone.utc)
-    grouped_deliveries: dict[tuple[int, NotificationChannel], list[Any]] = defaultdict(list)
+    grouped_deliveries = _group_deliveries(
+        deliveries=deliveries,
+        delivery_repository=delivery_repository,
+        notification_repository=notification_repository,
+        user_id=user_id,
+    )
+
+    notifications_by_id, listings_by_id, users_by_id, active_push_subscriptions_by_user_id = _build_delivery_context(
+        grouped_deliveries=grouped_deliveries,
+        listing_repository=listing_repository,
+        user_repository=user_repository,
+        push_repository=push_repository,
+    )
+
+    processed = 0
     pending_changes = 0
 
-    notification_ids = {delivery.notification_id for delivery in deliveries}
-    notifications = notification_repository.get_by_ids(notification_ids=notification_ids)
-    notifications_by_id = {notification.id: notification for notification in notifications}
-    listing_ids = {notification.listing_id for notification in notifications}
-    listings = listing_repository.get_by_ids(listing_ids=listing_ids)
-    listings_by_id = {listing.id: listing for listing in listings}
-    user_ids = {notification.user_id for notification in notifications}
-    users = user_repository.get_by_ids(user_ids=user_ids)
-    users_by_id = {user.id: user for user in users}
-    active_push_subscriptions = push_repository.list_active_by_user_ids(user_ids=user_ids)
-    active_push_subscriptions_by_user_id: dict[int, Any] = {}
-    for subscription in active_push_subscriptions:
-        active_push_subscriptions_by_user_id.setdefault(subscription.user_id, subscription)
-
-    for delivery in deliveries:
-        notification = notifications_by_id.get(delivery.notification_id)
-        if notification is None:
-            delivery_repository.mark_failed(delivery=delivery, error_message="Notification is missing")
-            processed += 1
-            pending_changes += 1
-            continue
-        if user_id is not None and notification.user_id != user_id:
-            continue
-        grouped_deliveries[(notification.user_id, delivery.channel)].append((delivery, notification))
-
     for (target_user_id, channel), group in grouped_deliveries.items():
-        try:
-            user = users_by_id.get(target_user_id)
-            if user is None:
-                for delivery, _ in group:
-                    delivery_repository.mark_failed(delivery=delivery, error_message="User is missing")
-                    processed += 1
-                    pending_changes += 1
-                continue
-
-            listings_payload: list[tuple[str, str, float | None, int]] = []
-            failed_delivery: Any | None = None
-            for delivery, notification in group:
-                listing = listings_by_id.get(notification.listing_id)
-                if listing is None:
-                    failed_delivery = delivery
-                    break
-                listings_payload.append(
-                    (
-                        listing.title,
-                        listing.url,
-                        float(listing.price) if listing.price is not None else None,
-                        listing.id,
-                    )
-                )
-            if failed_delivery is not None:
-                for delivery, _ in group:
-                    delivery_repository.mark_failed(delivery=delivery, error_message="Listing is missing")
-                    processed += 1
-                    pending_changes += 1
-                continue
-
-            failed_push_endpoint: str | None = None
-            listing_messages = [(title, url, price) for title, url, price, _ in listings_payload]
-            if channel == NotificationChannel.email:
-                email_sender.send_many(
-                    recipient=user.email,
-                    listings=listing_messages,
-                )
-            else:
-                push_subscription = active_push_subscriptions_by_user_id.get(user.id)
-                if push_subscription is None:
-                    raise RuntimeError("No active push subscription")
-                failed_push_endpoint = push_subscription.endpoint
-                push_sender.send_many(
-                    push_subscription=push_subscription,
-                    listings=listing_messages,
-                )
-
-            for delivery, _ in group:
-                delivery_repository.mark_sent(delivery=delivery, sent_at=now)
-                processed += 1
-                pending_changes += 1
-            for _, _, _, listing_id in listings_payload:
-                sent_listing_repository.create_if_missing(user_id=user.id, listing_id=listing_id, sent_at=now)
-                pending_changes += 1
-        except WebPushException as exc:
-            delivery_repository.rollback()
-            status_code = getattr(getattr(exc, "response", None), "status_code", None)
-            if status_code in {404, 410} and failed_push_endpoint is not None:
-                push_repository.deactivate_by_endpoint(endpoint=failed_push_endpoint)
-            for delivery, _ in group:
-                delivery_repository.mark_failed(delivery=delivery, error_message=str(exc))
-                processed += 1
-                pending_changes += 1
-        except Exception as exc:
-            for delivery, _ in group:
-                delivery_repository.mark_failed(delivery=delivery, error_message=str(exc))
-                processed += 1
-                pending_changes += 1
+        processed_delta, pending_changes_delta = _process_delivery_group(
+            group=group,
+            target_user_id=target_user_id,
+            channel=channel,
+            now=now,
+            users_by_id=users_by_id,
+            listings_by_id=listings_by_id,
+            active_push_subscriptions_by_user_id=active_push_subscriptions_by_user_id,
+            delivery_repository=delivery_repository,
+            push_repository=push_repository,
+            sent_listing_repository=sent_listing_repository,
+            email_sender=email_sender,
+            push_sender=push_sender,
+        )
+        processed += processed_delta
+        pending_changes += pending_changes_delta
 
         if pending_changes >= commit_every:
             delivery_repository.flush()
@@ -283,3 +231,133 @@ def process_pending_deliveries(
         delivery_repository.commit()
 
     return processed
+
+def _group_deliveries(
+    *,
+    deliveries: list[Any],
+    delivery_repository: NotificationDeliveryRepository,
+    notification_repository: NotificationRepository,
+    user_id: int | None,
+) -> dict[tuple[int, NotificationChannel], list[Any]]:
+    notification_ids = {delivery.notification_id for delivery in deliveries}
+    notifications = notification_repository.get_by_ids(notification_ids=notification_ids)
+    notifications_by_id = {notification.id: notification for notification in notifications}
+    
+    grouped_deliveries: dict[tuple[int, NotificationChannel], list[Any]] = defaultdict(list)
+    for delivery in deliveries:
+        notification = notifications_by_id.get(delivery.notification_id)
+        if notification is None:
+            delivery_repository.mark_failed(delivery=delivery, error_message="Notification is missing")
+            continue
+        if user_id is not None and notification.user_id != user_id:
+            continue
+        grouped_deliveries[(notification.user_id, delivery.channel)].append((delivery, notification))
+    return grouped_deliveries
+
+def _build_delivery_context(
+    *,
+    grouped_deliveries: dict[tuple[int, NotificationChannel], list[Any]],
+    listing_repository: ListingRepository,
+    user_repository: UserRepository,
+    push_repository: PushSubscriptionRepository,
+) -> tuple[dict[int, Any], dict[int, Any], dict[int, Any], dict[int, Any]]:
+    notifications = [notification for group in grouped_deliveries.values() for _, notification in group]
+    notifications_by_id = {notification.id: notification for notification in notifications}
+    listing_ids = {notification.listing_id for notification in notifications}
+    listings = listing_repository.get_by_ids(listing_ids=listing_ids)
+    listings_by_id = {listing.id: listing for listing in listings}
+    user_ids = {notification.user_id for notification in notifications}
+    users = user_repository.get_by_ids(user_ids=user_ids)
+    users_by_id = {user.id: user for user in users}
+    active_push_subscriptions = push_repository.list_active_by_user_ids(user_ids=user_ids)
+    active_push_subscriptions_by_user_id: dict[int, Any] = {}
+    for subscription in active_push_subscriptions:
+        active_push_subscriptions_by_user_id.setdefault(subscription.user_id, subscription)
+    return notifications_by_id, listings_by_id, users_by_id, active_push_subscriptions_by_user_id
+
+def _process_delivery_group(
+    *,
+    group: list[Any],
+    target_user_id: int,
+    channel: NotificationChannel,
+    now: datetime,
+    users_by_id: dict[int, Any],
+    listings_by_id: dict[int, Any],
+    active_push_subscriptions_by_user_id: dict[int, Any],
+    delivery_repository: NotificationDeliveryRepository,
+    push_repository: PushSubscriptionRepository,
+    sent_listing_repository: SentListingRepository,
+    email_sender: EmailSender,
+    push_sender: PushSender,
+) -> tuple[int, int]:
+    processed = 0
+    pending_changes = 0
+    failed_push_endpoint: str | None = None
+    try:
+        user = users_by_id.get(target_user_id)
+        if user is None:
+            return _mark_group_failed(group=group, delivery_repository=delivery_repository, error_message="User is missing")
+
+        listings_payload = _collect_listings_payload(group=group, listings_by_id=listings_by_id)
+        if listings_payload is None:
+            return _mark_group_failed(group=group, delivery_repository=delivery_repository, error_message="Listing is missing")
+
+        listing_messages = [(title, url, price) for title, url, price, _ in listings_payload]
+        if channel == NotificationChannel.email:
+            email_sender.send_many(recipient=user.email, listings=listing_messages)
+        else:
+            push_subscription = active_push_subscriptions_by_user_id.get(user.id)
+            if push_subscription is None:
+                raise RuntimeError("No active push subscription")
+            failed_push_endpoint = push_subscription.endpoint
+            push_sender.send_many(push_subscription=push_subscription, listings=listing_messages)
+
+        for delivery, _ in group:
+            delivery_repository.mark_sent(delivery=delivery, sent_at=now)
+            processed += 1
+            pending_changes += 1
+        for _, _, _, listing_id in listings_payload:
+            sent_listing_repository.create_if_missing(user_id=user.id, listing_id=listing_id, sent_at=now)
+            pending_changes += 1
+    except WebPushException as exc:
+        delivery_repository.rollback()
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code in {404, 410} and failed_push_endpoint is not None:
+            push_repository.deactivate_by_endpoint(endpoint=failed_push_endpoint)
+        processed_delta, pending_changes_delta = _mark_group_failed(
+            group=group,
+            delivery_repository=delivery_repository,
+            error_message=str(exc),
+        )
+        processed += processed_delta
+        pending_changes += pending_changes_delta
+    except Exception as exc:
+        processed_delta, pending_changes_delta = _mark_group_failed(
+            group=group,
+            delivery_repository=delivery_repository,
+            error_message=str(exc),
+        )
+        processed += processed_delta
+        pending_changes += pending_changes_delta
+    return processed, pending_changes
+
+
+def _collect_listings_payload(*, group: list[Any], listings_by_id: dict[int, Any]) -> list[tuple[str, str, float | None, int]] | None:
+    listings_payload: list[tuple[str, str, float | None, int]] = []
+    for _, notification in group:
+        listing = listings_by_id.get(notification.listing_id)
+        if listing is None:
+            return None
+        listings_payload.append(
+            (listing.title, listing.url, float(listing.price) if listing.price is not None else None, listing.id)
+        )
+    return listings_payload
+
+def _mark_group_failed(*, group: list[Any], delivery_repository: NotificationDeliveryRepository, error_message: str) -> tuple[int, int]:
+    processed = 0
+    pending_changes = 0
+    for delivery, _ in group:
+        delivery_repository.mark_failed(delivery=delivery, error_message=error_message)
+        processed += 1
+        pending_changes += 1
+    return processed, pending_changes

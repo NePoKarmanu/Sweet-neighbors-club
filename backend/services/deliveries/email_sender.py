@@ -20,14 +20,14 @@ class EmailSender:
             raise RuntimeError("No listings to send")
 
         message = EmailMessage()
-        message["Subject"] = "New listings found"
+        message["Subject"] = "Новые объявления для Вас!"
         message["From"] = settings.SMTP_FROM
         message["To"] = recipient
-        lines = ["New apartments were found for your filters:", ""]
+        lines = ["Новые объекты были найдены по вашим фильтрам:", ""]
         for index, (title, url, price) in enumerate(listings, start=1):
             lines.append(f"{index}. {title}")
             lines.append(f"   {url}")
-            lines.append(f"   Price: {price}")
+            lines.append(f"   Цена: {price}")
             lines.append("")
         message.set_content("\n".join(lines))
 
