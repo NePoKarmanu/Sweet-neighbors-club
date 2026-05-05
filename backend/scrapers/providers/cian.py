@@ -449,7 +449,7 @@ def _extract_image_url(offer: dict[str, Any], *, base_url: str) -> str | None:
     image_url = _to_string(
         _first_deep_value(
             offer,
-            ("fullUrl", "url", "imageUrl", "src", "jpeg", "webp"),
+            ("thumbnailUrl", "imageUrl", "src", "jpeg", "webp", "jpg"),
         )
     )
     if image_url is None:

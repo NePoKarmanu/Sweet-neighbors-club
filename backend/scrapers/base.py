@@ -21,8 +21,8 @@ class ScraperProviderNotFoundError(Exception):
 class ScrapedListingDTO:
     external_id: str
     url: str
-    image_url: str | None = None
     title: str
+    image_url: str | None = None
     city: str | None = None
     published_at: datetime | None = None
     parsed_at: datetime | None = None
