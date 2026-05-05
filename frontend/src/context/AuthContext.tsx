@@ -3,6 +3,7 @@ import type { User, TokenResponse } from '../types';
 import { signin as apiSignin,
          signup as apiSignup, 
          signout as apiSignout,
+         getMe as apiGetMe,
          updateProfile as updateProfileApi
         } from '../api/authApi';
 
@@ -25,20 +26,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      // Здесь будет запрос /auth/me для верификации токена, когда будет готов
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) setUser(JSON.parse(savedUser));
+    if (!token) {
       setIsLoading(false);
-    } else {
-      setIsLoading(false);
+      return;
     }
+    let isMounted = true;
+    const run = async () => {
+      try {
+        const me = await apiGetMe();
+        if (!isMounted) return;
+        setUser(me);
+        localStorage.setItem('user', JSON.stringify(me));
+      } catch {
+        if (!isMounted) return;
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
   const updateAuth = useCallback((data: TokenResponse) => {
     setToken(data.access_token);
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
     localStorage.setItem('user', JSON.stringify(data.user));
   }, []);
 
@@ -59,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
   }, [token]);
 

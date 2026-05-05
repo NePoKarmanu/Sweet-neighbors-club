@@ -21,6 +21,7 @@ class Listing(Base):
     external_id: Mapped[str] = mapped_column(String(128), nullable=False)
 
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

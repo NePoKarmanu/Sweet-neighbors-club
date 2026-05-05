@@ -1,5 +1,5 @@
 import authClient from './authClient';
-import type { TokenResponse, User } from '../types';
+import type { RefreshTokenResponse, TokenResponse, User } from '../types';
 
 export async function signup(email: string, phone: string, password: string): Promise<TokenResponse> {
   const { data } = await authClient.post<TokenResponse>('/auth/signup', {
@@ -28,6 +28,18 @@ export async function signout(token: string): Promise<void> {
       },
     },
   );
+}
+
+export async function refresh(refreshToken: string): Promise<RefreshTokenResponse> {
+  const { data } = await authClient.post<RefreshTokenResponse>('/auth/refresh', {
+    refresh_token: refreshToken,
+  });
+  return data;
+}
+
+export async function getMe(): Promise<User> {
+  const { data } = await authClient.get<User>('/auth/me');
+  return data;
 }
 
 export interface UpdateProfilePayload {

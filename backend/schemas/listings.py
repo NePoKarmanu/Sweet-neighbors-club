@@ -22,6 +22,7 @@ class ListingItemResponse(BaseModel):
     aggregator_id: int
     external_id: str
     url: str
+    image_url: str | None
     published_at: datetime | None
     parsed_at: datetime | None
     title: str

@@ -10,6 +10,9 @@ from backend.utils.auth import get_current_user
 
 router = APIRouter()
 
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+    return UserResponse.model_validate(current_user)
 
 @router.put("/profile", response_model=UserResponse)
 def update_profile(

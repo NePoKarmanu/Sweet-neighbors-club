@@ -79,6 +79,7 @@ def list_listings(
             aggregator_id=item.aggregator_id,
             external_id=item.external_id,
             url=item.url,
+            image_url=item.image_url,
             published_at=item.published_at,
             parsed_at=item.parsed_at,
             title=item.title,
