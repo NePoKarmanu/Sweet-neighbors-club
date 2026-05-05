@@ -22,6 +22,7 @@ class ScrapedListingDTO:
     external_id: str
     url: str
     title: str
+    image_url: str | None = None
     city: str | None = None
     published_at: datetime | None = None
     parsed_at: datetime | None = None
@@ -35,6 +36,7 @@ class ScrapedListingDTO:
         return {
             "external_id": self.external_id,
             "url": self.url,
+            "image_url": self.image_url,
             "published_at": self.published_at,
             "parsed_at": self.parsed_at,
             "title": self.title,

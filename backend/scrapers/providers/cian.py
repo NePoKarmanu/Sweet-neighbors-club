@@ -114,6 +114,7 @@ class CianScraper:
         return ScrapedListingDTO(
             external_id=external_id,
             url=absolute_url,
+            image_url=_extract_image_url(offer, base_url=self.base_url),
             published_at=_to_datetime(
                 _first_deep_value(offer, ("publishedAt", "creationDate", "addedTimestamp"))
             ),
@@ -442,6 +443,18 @@ def _extract_city(offer: dict[str, Any], *, base_url: str) -> str | None:
         if slug:
             return slug.replace("-", " ").strip().title()
     return None
+
+
+def _extract_image_url(offer: dict[str, Any], *, base_url: str) -> str | None:
+    image_url = _to_string(
+        _first_deep_value(
+            offer,
+            ("thumbnailUrl", "imageUrl", "src", "jpeg", "webp", "jpg"),
+        )
+    )
+    if image_url is None:
+        return None
+    return urljoin(base_url, image_url)
 
 
 def _to_string_list(value: Any) -> list[str]:

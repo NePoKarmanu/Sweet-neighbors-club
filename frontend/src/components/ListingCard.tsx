@@ -13,6 +13,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
     area,
     floor,
     url,
+    image_url,
     data: { property_type, has_repair, build_year, creator_type, living_conditions },
   } = listing;
 
@@ -37,7 +38,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
     >
       <div className="listing-card-image">
         <img
-          src="https://via.placeholder.com/300x200?text=Недвижимость"
+          src={image_url ?? 'https://via.placeholder.com/300x200?text=Недвижимость'}
           alt={title}
         />
       </div>

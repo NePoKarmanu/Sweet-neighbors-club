@@ -8,8 +8,14 @@ export interface User {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: User;
+}
+
+export interface RefreshTokenResponse {
+  access_token: string;
+  token_type: string;
 }
 
 export interface ApiError {
@@ -29,6 +35,7 @@ export interface Listing {
   aggregator_id: number;
   external_id: string;
   url: string;
+  image_url: string | null;
   published_at: string | null;
   parsed_at: string | null;
   title: string;
@@ -61,3 +68,30 @@ export interface ListingSearchDTO {
 
 export type ListingSortBy = 'published_at' | 'price';
 export type ListingSortOrder = 'asc' | 'desc';
+
+export interface NotificationSettingsPayload {
+  city: string;
+  notify_email: boolean;
+  notify_push: boolean;
+}
+
+export interface NotificationSettingsResponse {
+  subscription_id: number;
+  filter_id: number;
+  notify_email: boolean;
+  notify_push: boolean;
+  is_active: boolean;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+}
+
+export interface PushSubscriptionResponse {
+  id: number;
+  endpoint: string;
+  is_active: boolean;
+}

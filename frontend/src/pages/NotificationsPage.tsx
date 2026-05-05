@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createNotificationSettings } from '../api/notificationsApi';
 
 const NotificationsPage = () => {
   // Временное хранение настроек, пока нет API для их сохранения
@@ -24,10 +25,15 @@ const NotificationsPage = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await createNotificationSettings({
+      city: 'Воронеж',
+      notify_email: emailEnabled,
+      notify_push: pushEnabled,
+    });
     localStorage.setItem('notify_email', String(emailEnabled));
     localStorage.setItem('notify_push', String(pushEnabled));
-    setMessage('Настройки уведомлений сохранены локально');
+    setMessage('Настройки уведомлений сохранены');
   };
 
   return (
@@ -70,7 +76,7 @@ const NotificationsPage = () => {
         <label style={{ display: 'block', marginTop: '0.5rem' }}>Цена от: <input disabled placeholder="0" style={{ width: '100%', marginTop: '0.5rem' }} /></label>
       </div>
 
-      <button onClick={handleSave} style={{ marginTop: '1.5rem', width: '100%' }}>
+      <button onClick={() => void handleSave()} style={{ marginTop: '1.5rem', width: '100%' }}>
         Сохранить настройки
       </button>
 
