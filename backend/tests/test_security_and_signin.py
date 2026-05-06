@@ -4,8 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 import jwt
 
-from backend.dto.auth import RefreshDTO, SigninDTO
+from backend.dto.auth import RefreshDTO, SigninDTO, SignupDTO
 from backend.services.signin import refresh_access_token, signin_user
+from backend.services.signup import signup_user
 from backend.utils import jwt as jwt_utils
 from backend.utils.security import hash_password, verify_password
 
@@ -85,6 +86,43 @@ def test_signin_fail_with_wrong_password() -> None:
             pass
     finally:
         signin_module.UserRepository = original_repo
+
+def test_signup_returns_access_and_refresh_tokens() -> None:
+    user = SimpleNamespace(
+        id=2,
+        email="new@example.com",
+        phone="+15557654321",
+        is_staff=False,
+        password_hash="hashed",
+    )
+    db = MagicMock()
+    users_repo = MagicMock()
+    users_repo.get_by_email.return_value = None
+    users_repo.get_by_phone.return_value = None
+    users_repo.create.return_value = user
+
+    from backend.services import signup as signup_module
+
+    original_repo = signup_module.UserRepository
+    original_access = signup_module.create_access_token
+    original_refresh = signup_module.create_refresh_token
+    signup_module.UserRepository = MagicMock(return_value=users_repo)
+    signup_module.create_access_token = MagicMock(return_value="access-token")
+    signup_module.create_refresh_token = MagicMock(return_value="refresh-token")
+
+    try:
+        response = signup_user(
+            SignupDTO(email=user.email, phone=user.phone, password="Password123!"),
+            db,
+        )
+    finally:
+        signup_module.UserRepository = original_repo
+        signup_module.create_access_token = original_access
+        signup_module.create_refresh_token = original_refresh
+
+    assert response.access_token == "access-token"
+    assert response.refresh_token == "refresh-token"
+    
 
 def test_decode_access_token_rejects_refresh_token() -> None:
     token = jwt_utils.create_refresh_token(user_id=1)

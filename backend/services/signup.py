@@ -6,7 +6,7 @@ from backend.db.repositories.users import UserRepository
 from backend.dto.auth import SignupDTO
 from backend.exceptions import ConflictAppError
 from backend.schemas.auth import TokenResponse, UserResponse
-from backend.utils.jwt import create_access_token
+from backend.utils.jwt import create_access_token, create_refresh_token
 from backend.utils.security import hash_password
 
 
@@ -28,5 +28,6 @@ def signup_user(data: SignupDTO, db: Session) -> TokenResponse:
 
     return TokenResponse(
         access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
         user=UserResponse.model_validate(user),
     )
