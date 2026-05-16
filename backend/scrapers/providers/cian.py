@@ -100,8 +100,8 @@ class CianScraper:
         *,
         parsed_at: datetime,
     ) -> ScrapedListingDTO | None:
-        external_id = _to_string(_first_deep_value(offer, ("id", "cianId", "offerId")))
-        url = _to_string(_first_deep_value(offer, ("url", "canonicalUrl", "fullUrl")))
+        external_id = _to_string(offer.get("id") or offer.get("cianId"))
+        url = _to_string(offer.get("fullUrl") or offer.get("url"))
         if external_id is None:
             return None
 
@@ -109,33 +109,21 @@ class CianScraper:
             url = f"/rent/flat/{external_id}/"
 
         absolute_url = urljoin(self.base_url, url)
-        title = _to_string(_first_deep_value(offer, ("title", "subtitle", "header")))
+        title = _to_string(offer.get("formattedFullInfo")) or _to_string(offer.get("title"))
         city = _extract_city(offer, base_url=self.base_url)
         return ScrapedListingDTO(
             external_id=external_id,
             url=absolute_url,
             image_url=_extract_image_url(offer, base_url=self.base_url),
-            published_at=_to_datetime(
-                _first_deep_value(offer, ("publishedAt", "creationDate", "addedTimestamp"))
-            ),
+            published_at=_to_datetime(offer.get("publishedAt") or offer.get("creationDate") or offer.get("addedTimestamp")),
             parsed_at=parsed_at,
             title=title or f"Cian listing {external_id}",
             city=city,
-            price=_to_float(_first_deep_value(offer, ("price", "priceRur", "totalPrice"))),
-            rooms=_to_int(_first_deep_value(offer, ("rooms", "roomsCount", "roomCount"))),
-            area=_to_float(_first_deep_value(offer, ("totalArea", "area", "allArea"))),
-            floor=_to_int(_first_deep_value(offer, ("floor", "floorNumber"))),
-            data={
-                "creator_type": _extract_creator_type(offer),
-                "build_year": _to_int(_first_deep_value(offer, ("buildYear", "build_year"))),
-                "has_repair": _to_bool(_first_deep_value(offer, ("hasRepair", "has_repair", "repair"))),
-                "property_type": _to_string(
-                    _first_deep_value(offer, ("propertyType", "property_type", "offerType"))
-                ),
-                "living_conditions": _to_string_list(
-                    _first_deep_value(offer, ("livingConditions", "living_conditions"))
-                ),
-            },
+            price=_extract_price(offer),
+            rooms=_to_int(offer.get("roomsCount")),
+            area=_to_float(offer.get("totalArea")),
+            floor=_to_int(offer.get("floorNumber")),
+            data=_build_listing_data(offer),
         )
 
     def _looks_like_captcha(self, html: str) -> bool:
@@ -300,7 +288,7 @@ def _find_offer_list(state: Any) -> list[dict[str, Any]]:
 def _looks_like_offer(value: dict[str, Any]) -> bool:
     has_id = _first_deep_value(value, ("id", "cianId", "offerId")) is not None
     has_url = _first_deep_value(value, ("url", "canonicalUrl", "fullUrl")) is not None
-    has_listing_data = _first_deep_value(value, ("price", "title", "totalArea", "roomsCount")) is not None
+    has_listing_data = _first_deep_value(value, ("price", "offerTitle", "totalArea", "roomsCount")) is not None
     has_product_shape = _first_deep_value(value, ("position", "photosCount", "dealType")) is not None
     return has_id and ((has_url and has_listing_data) or (has_product_shape and has_listing_data))
 
@@ -384,56 +372,15 @@ def _to_datetime(value: Any) -> datetime | None:
     return None
 
 
-def _normalize_creator_type(value: Any) -> str | None:
-    text = _to_string(value)
-    if text is None:
-        return None
-    lowered = text.lower()
-    if lowered in {"owner", "private", "person"}:
-        return "owner"
-    if lowered in {"agency", "agent", "realtor", "developer"}:
+def _extract_creator_type(offer: dict[str, Any]) -> str:
+    is_by_homeowner = offer.get("isByHomeowner")
+    if is_by_homeowner is False:
         return "agency"
-    return None
-
-
-def _extract_creator_type(offer: dict[str, Any]) -> str | None:
-    is_by_homeowner = _first_deep_value(offer, ("isByHomeowner",))
-    if isinstance(is_by_homeowner, bool):
-        return "owner" if is_by_homeowner else "agency"
-
-    user = offer.get("user")
-    if isinstance(user, dict):
-        is_agent = user.get("isAgent")
-        if isinstance(is_agent, bool):
-            return "agency" if is_agent else "owner"
-
-        from_user_type = _normalize_creator_type(user.get("userType"))
-        if from_user_type is not None:
-            return from_user_type
-
-        if _to_string(user.get("agencyName")) is not None:
-            return "agency"
-
-    ga_label = _to_string(_first_deep_value(offer, ("gaLabel",)))
-    if ga_label:
-        lowered = ga_label.lower()
-        if "owner=1" in lowered:
-            return "owner"
-        if "owner=0" in lowered or "spec=agent" in lowered or "spec=company" in lowered:
-            return "agency"
-
-    return _normalize_creator_type(
-        _first_deep_value(offer, ("creator_type", "creatorType", "sellerType", "userType"))
-    )
+    return "owner"
 
 
 def _extract_city(offer: dict[str, Any], *, base_url: str) -> str | None:
-    city = _to_string(
-        _first_deep_value(
-            offer,
-            ("city", "cityName", "settlementName", "localityName", "regionName"),
-        )
-    )
+    city = _to_string(offer.get("geo", {}).get("address", [None, None])[1].get("title")) if isinstance(offer.get("geo", {}).get("address"), list) and len(offer.get("geo", {}).get("address")) > 1 and isinstance(offer.get("geo", {}).get("address")[1], dict) else None
     if city is not None:
         return city
 
@@ -446,21 +393,32 @@ def _extract_city(offer: dict[str, Any], *, base_url: str) -> str | None:
 
 
 def _extract_image_url(offer: dict[str, Any], *, base_url: str) -> str | None:
-    image_url = _to_string(
-        _first_deep_value(
-            offer,
-            ("thumbnailUrl", "imageUrl", "src", "jpeg", "webp", "jpg"),
-        )
-    )
+    photos = offer.get("photos")
+    image_url = None
+    if isinstance(photos, list) and photos:
+        first_photo = photos[0]
+        if isinstance(first_photo, dict):
+            image_url = _to_string(first_photo.get("thumbnailUrl") or first_photo.get("fullUrl"))
     if image_url is None:
         return None
     return urljoin(base_url, image_url)
 
 
-def _to_string_list(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [item for item in (_to_string(item) for item in value) if item is not None]
-    text = _to_string(value)
-    if text is None:
-        return []
-    return [text]
+def _build_listing_data(offer: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "creator_type": _extract_creator_type(offer),
+        "build_year": _to_int(offer.get("building", {}).get("buildYear")),
+        "has_furniture": _to_bool(offer.get("hasFurniture")),
+        "property_type": _to_string(offer.get("offerType")),
+        "living_conditions": [],
+        "source_payload": offer,
+    }
+
+
+def _extract_price(offer: dict[str, Any]) -> float | None:
+    bargain_terms = offer.get("bargainTerms")
+    if isinstance(bargain_terms, dict):
+        return _to_float(bargain_terms.get("priceRur") or bargain_terms.get("price"))
+    return _to_float(offer.get("price"))
+
+

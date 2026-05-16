@@ -45,15 +45,15 @@ class CianScraperTests(unittest.TestCase):
                     {
                       "id": 123,
                       "url": "/rent/flat/123/",
-                      "title": "2-room flat",
+                      "formattedFullInfo": "2-room flat · 45.5 m² · 4/9 floor",
                       "price": {"value": 15000},
                       "roomsCount": 2,
                       "totalArea": 45.5,
                       "floorNumber": 4,
                       "publishedAt": "2026-04-24T11:04:58+00:00",
-                      "sellerType": "agency",
+                      "isByHomeowner": false,
+                      "hasFurniture": true,
                       "buildYear": 2005,
-                      "hasRepair": true,
                       "propertyType": "flat",
                       "livingConditions": ["furniture"]
                     }
@@ -75,12 +75,14 @@ class CianScraperTests(unittest.TestCase):
         self.assertEqual(listing.rooms, 2)
         self.assertEqual(listing.area, 45.5)
         self.assertEqual(listing.floor, 4)
+        self.assertEqual(listing.title, "2-room flat · 45.5 m² · 4/9 floor")
         self.assertEqual(listing.data["creator_type"], "agency")
+        self.assertEqual(listing.data["has_furniture"], True)
 
     def test_extract_creator_type(self) -> None:
         owner_offer = {"id": 1, "isByHomeowner": True}
         agency_offer = {"id": 2, "isByHomeowner": False}
-        null_homeowner_offer = {"id": 3, "isByHomeowner": None, "gaLabel": "deal=1;owner=0;spec=agent"}
+        null_homeowner_offer = {"id": 3, "isByHomeowner": None}
 
         scraper = CianScraper()
         parsed_at = datetime.now(timezone.utc)
@@ -94,7 +96,7 @@ class CianScraperTests(unittest.TestCase):
         self.assertIsNotNone(null_homeowner_listing)
         self.assertEqual(owner_listing.data["creator_type"], "owner")
         self.assertEqual(agency_listing.data["creator_type"], "agency")
-        self.assertEqual(null_homeowner_listing.data["creator_type"], "agency")
+        self.assertEqual(null_homeowner_listing.data["creator_type"], "owner")
 
 
 if __name__ == "__main__":

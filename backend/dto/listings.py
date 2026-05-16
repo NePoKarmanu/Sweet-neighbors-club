@@ -28,7 +28,7 @@ class ListingSearchDTO(BaseModel):
     property_types: list[str] | None = None
     creator_types: list[Literal["agency", "owner"]] | None = None
     living_conditions: list[str] | None = None
-    has_repair: bool | None = None
+    has_furniture: bool | None = None
 
     price: RangeDTO | None = None
     area: RangeDTO | None = None
@@ -42,6 +42,6 @@ class ListingDataDTO(BaseModel):
 
     creator_type: Literal["agency", "owner"] | None = None
     build_year: int | None = None
-    has_repair: bool | None = None
+    has_furniture: bool | None = None
     property_type: str | None = None
     living_conditions: list[str] = Field(default_factory=list)

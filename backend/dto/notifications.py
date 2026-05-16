@@ -17,7 +17,7 @@ class NotificationSettingsDTO(BaseModel):
     property_types: list[str] | None = None
     creator_types: list[str] | None = None
     living_conditions: list[str] | None = None
-    has_repair: bool | None = None
+    has_furniture: bool | None = None
     price: RangeDTO | None = None
     area: RangeDTO | None = None
     rooms: RangeDTO | None = None
