@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     AVITO_REQUEST_TIMEOUT_SECONDS: int = 20
     AVITO_COOKIE: str | None = None
     AVITO_USER_AGENT: str | None = None
+    DOMCLICK_SEARCH_URL: str = (
+        "https://voronezh.domclick.ru/search?deal_type=rent&category=living&offer_type=flat&offset=0"
+    )
+    DOMCLICK_REQUEST_TIMEOUT_SECONDS: int = 20
+    DOMCLICK_COOKIE: str | None = None
+    DOMCLICK_USER_AGENT: str | None = None
     SCRAPING_BEAT_ENABLED: bool = True
     SCRAPING_INTERVAL_MINUTES: int = 10
     SCRAPER_STALE_MISSES_THRESHOLD: int = 3
