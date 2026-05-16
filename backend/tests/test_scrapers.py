@@ -6,6 +6,7 @@ import unittest
 from backend.scrapers.base import ScraperProviderNotFoundError
 from backend.scrapers.providers.avito import AvitoScraper
 from backend.scrapers.providers.cian import CianScraper
+from backend.scrapers.providers.domclick import DomclickScraper
 from backend.scrapers.registry import load_scrapers
 
 
@@ -16,6 +17,7 @@ class ScraperRegistryTests(unittest.TestCase):
 
         self.assertIn("cian", provider_names)
         self.assertIn("avito", provider_names)
+        self.assertIn("domclick", provider_names)
 
     def test_load_scrapers_filters_by_provider(self) -> None:
         scrapers = load_scrapers(provider_name="  CIAN ")
@@ -26,6 +28,12 @@ class ScraperRegistryTests(unittest.TestCase):
     def test_load_scrapers_raises_for_unknown_provider(self) -> None:
         with self.assertRaises(ScraperProviderNotFoundError):
             load_scrapers(provider_name="unknown_provider")
+
+    def test_load_scrapers_filters_by_domclick_provider(self) -> None:
+        scrapers = load_scrapers(provider_name=" DomClick ")
+
+        self.assertEqual(len(scrapers), 1)
+        self.assertEqual(scrapers[0].aggregator_name, "domclick")
 
     def test_load_scrapers_filters_by_avito_provider(self) -> None:
         scrapers = load_scrapers(provider_name=" avito ")
@@ -166,6 +174,59 @@ class AvitoScraperTests(unittest.TestCase):
         self.assertEqual(second.price, 30000)
         self.assertIsNotNone(second.published_at)
 
+class DomclickScraperTests(unittest.TestCase):
+    def test_build_headers_applies_runtime_overrides(self) -> None:
+        scraper = DomclickScraper(cookie="cookie=3", user_agent="custom-domclick-agent")
+
+        headers = scraper._build_headers()
+
+        self.assertEqual(headers["Cookie"], "cookie=3")
+        self.assertEqual(headers["User-Agent"], "custom-domclick-agent")
+
+    def test_parse_ssr_state(self) -> None:
+        html = """
+        <html><body><script>
+        window.__SSR_STATE__={
+          "search":{
+            "pages":{
+              "0":{
+                "ids":["111"],
+                "entities":{
+                  "111":{
+                    "id":"111",
+                    "path":"/offer/111",
+                    "photos":[{"url":"/img/111.jpg"}],
+                    "publishedDate":"2026-05-14T10:00:00+00:00",
+                    "offerRegionName":"Воронеж",
+                    "price":28000,
+                    "objectInfo":{"rooms":1,"area":38.5,"floor":3,"floors":10},
+                    "address":"ул. Ленина, 10",
+                    "isOwner":true,
+                    "offerType":"flat",
+                    "house":{"buildYear":2010},
+                    "roomsOffered":undefined
+                  }
+                }
+              }
+            }
+          }
+        };
+        </script></body></html>
+        """
+
+        listings = DomclickScraper().parse(html)
+
+        self.assertEqual(len(listings), 1)
+        listing = listings[0]
+        self.assertEqual(listing.external_id, "111")
+        self.assertEqual(listing.url, "https://voronezh.domclick.ru/offer/111")
+        self.assertEqual(listing.price, 28000)
+        self.assertEqual(listing.rooms, 1)
+        self.assertEqual(listing.area, 38.5)
+        self.assertEqual(listing.floor, 3)
+        self.assertEqual(listing.city, "Воронеж")
+        self.assertEqual(listing.image_url, "https://voronezh.domclick.ru/img/111.jpg")
+        self.assertEqual(listing.title, "1-к квартира, 38.5 м², 3/10 эт., ул. Ленина, 10")
 
 if __name__ == "__main__":
     unittest.main()
