@@ -18,7 +18,7 @@ class NotificationSettingsRequest(BaseModel):
         examples=[["agency"], ["owner"], ["agency", "owner"]],
     )
     living_conditions: list[str] | None = None
-    has_repair: bool | None = None
+    has_furniture: bool | None = None
     price: RangeDTO | None = None
     area: RangeDTO | None = None
     rooms: RangeDTO | None = None

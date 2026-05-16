@@ -59,7 +59,7 @@ def create_notification_settings(
                 "property_types": payload.property_types or [],
                 "creator_types": payload.creator_types or [],
                 "living_conditions": payload.living_conditions or [],
-                "has_repair": payload.has_repair,
+                "has_furniture": payload.has_furniture,
                 "build_year": {
                     "min": _range_value(payload.build_year, "min"),
                     "max": _range_value(payload.build_year, "max"),

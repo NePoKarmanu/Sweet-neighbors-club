@@ -10,7 +10,7 @@ class ListingDataResponse(BaseModel):
 
     creator_type: str | None = None
     build_year: int | None = None
-    has_repair: bool | None = None
+    has_furniture: bool | None = None
     property_type: str | None = None
     living_conditions: list[str] = Field(default_factory=list)
 

@@ -61,8 +61,8 @@ def _matches_listing(search_filter: SearchFilter, listing_data: dict[str, Any]) 
         if not all(condition in current_conditions for condition in living_conditions):
             return False
 
-    has_repair = params.get("has_repair")
-    if has_repair is not None and details.get("has_repair") is not has_repair:
+    has_furniture = params.get("has_furniture")
+    if has_furniture is not None and details.get("has_furniture") is not has_furniture:
         return False
 
     build_year_filter = params.get("build_year") or {}

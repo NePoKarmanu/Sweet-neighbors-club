@@ -85,9 +85,9 @@ class ListingRepository(BaseRepository[Listing]):
             if search.build_year.max is not None:
                 query = query.where(build_year_expr <= int(search.build_year.max))
 
-        if search.has_repair is not None:
-            has_repair_expr = cast(Listing.data["has_repair"].astext, Boolean)
-            query = query.where(has_repair_expr.is_(search.has_repair))
+        if search.has_furniture is not None:
+            has_furniture_expr = cast(Listing.data["has_furniture"].astext, Boolean)
+            query = query.where(has_furniture_expr.is_(search.has_furniture))
 
         if search.creator_types:
             query = query.where(Listing.data["creator_type"].astext.in_(search.creator_types))
