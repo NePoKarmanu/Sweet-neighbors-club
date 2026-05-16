@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     CIAN_REQUEST_TIMEOUT_SECONDS: int = 20
     CIAN_COOKIE: str | None = None
     CIAN_USER_AGENT: str | None = None
+    AVITO_SEARCH_URL: str = (
+        "https://www.avito.ru/voronezh/kvartiry/sdam/na_dlitelnyy_srok-ASgBAgICAkSSA8gQ8AeQUg"
+        "?context=H4sIAAAAAAAA_wFNALL_YToyOntzOjg6ImZyb21QYWdlIjtzOjE2OiJzZWFyY2hGb3JtV2lkZ2V0"
+        "IjtzOjE6InkiO3M6MTY6IkIxcnJGUDhOaVhlajNSeXAiO30ricE8TQAAAA&localPriority=0"
+    )
+    AVITO_REQUEST_TIMEOUT_SECONDS: int = 20
+    AVITO_COOKIE: str | None = None
+    AVITO_USER_AGENT: str | None = None
     SCRAPING_BEAT_ENABLED: bool = True
     SCRAPING_INTERVAL_MINUTES: int = 10
     SCRAPER_STALE_MISSES_THRESHOLD: int = 3
