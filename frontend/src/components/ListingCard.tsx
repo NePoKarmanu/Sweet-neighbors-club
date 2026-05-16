@@ -22,7 +22,7 @@ interface ListingCardProps {
 
 const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
   const {
-    title, price, rooms, area, floor, url,
+    title, price, rooms, area, floor, url, image_url,
     data: { property_type, has_repair, build_year, creator_type, living_conditions },
   } = listing;
 
@@ -41,7 +41,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="listing-card">
       <div className="listing-card-image">
-        <img src="https://via.placeholder.com/300x200?text=Недвижимость" alt={title} />
+        <img src={image_url ?? "https://via.placeholder.com/300x200?text=Недвижимость"} alt={title} />
       </div>
       <div className="listing-card-body">
         <h3 className="listing-card-title">{title}</h3>
