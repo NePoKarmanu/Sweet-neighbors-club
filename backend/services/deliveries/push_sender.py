@@ -23,6 +23,18 @@ class PushSender:
         log_info(
             logger, "Push send attempt started", event="notifications.push_send_attempt",
             channel="push", user_id=user_id, listings_count=len(listings)
+        if not settings.WEB_PUSH_VAPID_PRIVATE_KEY or not settings.WEB_PUSH_VAPID_CLAIMS_SUBJECT:
+            raise RuntimeError("Web push is not configured")
+        if not listings:
+            raise RuntimeError("No listings to send")
+
+        first_url = listings[0][1]
+        payload = json.dumps(
+            {
+                "title": "Новые объявления",
+                "body": "Появились новые объявления, проверьте почту",
+                "url": first_url,
+            }
         )
         try:
             if not settings.WEB_PUSH_VAPID_PRIVATE_KEY or not settings.WEB_PUSH_VAPID_CLAIMS_SUBJECT:

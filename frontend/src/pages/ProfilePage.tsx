@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import ErrorMessage from '../components/ui/ErrorMessage';
 
 const ProfilePage: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -85,7 +86,7 @@ const ProfilePage: React.FC = () => {
           />
         </div>
 
-        {error && <div className="server-error">{error}</div>}
+        {error && <ErrorMessage message={error} />}
         {successMsg && <div className="success-msg">{successMsg}</div>}
 
         <button type="submit" disabled={isLoading}>

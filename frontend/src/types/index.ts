@@ -73,6 +73,14 @@ export interface NotificationSettingsPayload {
   city: string;
   notify_email: boolean;
   notify_push: boolean;
+  property_types?: string[];
+  creator_types?: Array<'agency' | 'owner'>;
+  has_furniture?: boolean;
+  price?: { min?: number; max?: number };
+  area?: { min?: number; max?: number };
+  rooms?: { min?: number; max?: number };
+  floor?: { min?: number; max?: number };
+  build_year?: { min?: number; max?: number };
 }
 
 export interface NotificationSettingsResponse {

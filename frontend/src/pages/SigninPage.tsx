@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { validateEmail, validatePassword } from '../hooks/useValidation';
+import ErrorMessage from '../components/ui/ErrorMessage';
 
 const SigninPage = () => {
   const { login } = useAuth();
@@ -46,7 +47,7 @@ const SigninPage = () => {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           {errors.password && <span className="error">{errors.password}</span>}
         </div>
-        {serverError && <div className="server-error">{serverError}</div>}
+            {serverError && <ErrorMessage message={serverError} />}
         <button type="submit" disabled={isLoading}>
           {isLoading ? 'Вход...' : 'Войти'}
         </button>
