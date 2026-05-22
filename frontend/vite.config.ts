@@ -8,31 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons.svg', '1.png', '2.png'],
-      manifest: {
-        name: 'Sweet Neighbors Club',
-        short_name: 'SNC',
-        description: 'Уведомления об аренде и продажах жилья',
-        start_url: '/',
-        scope: '/',
-        display: 'standalone',
-        orientation: 'portrait',
-        theme_color: '#1d4ed8',
-        background_color: '#ffffff',
-        icons: [
-          {
-            src: '/1.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/2.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      },
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         navigateFallback: '/offline.html',
