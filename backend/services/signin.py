@@ -11,16 +11,19 @@ from jwt import InvalidTokenError
 from backend.utils.security import verify_password
 
 
-def signin_user(data: SigninDTO, db: Session) -> TokenResponse:
+def signin_user(data: SigninDTO, db: Session) -> tuple[TokenResponse, str]:
     user = UserRepository(db).get_by_email(data.email)
 
     if user is None or not verify_password(data.password, user.password_hash):
         raise AuthAppError("Invalid email or password")
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-        user=UserResponse.model_validate(user),
+    refresh_token = create_refresh_token(user.id)
+    return (
+        TokenResponse(
+            access_token=create_access_token(user.id),
+            user=UserResponse.model_validate(user),
+        ),
+        refresh_token,
     )
 
 def refresh_access_token(data: RefreshDTO) -> RefreshTokenResponse:

@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const authClient = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 let refreshRequest: Promise<string | null> | null = null;
@@ -27,16 +28,11 @@ authClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const refreshToken = localStorage.getItem('refresh_token');
-    if (!refreshToken) {
-      return Promise.reject(error);
-    }
-
     originalRequest._retry = true;
 
     if (!refreshRequest) {
       refreshRequest = authClient
-        .post('/auth/refresh', { refresh_token: refreshToken })
+        .post('/auth/refresh')
         .then((response) => {
           const nextToken = response.data?.access_token as string | undefined;
           if (!nextToken) {
@@ -47,7 +43,6 @@ authClient.interceptors.response.use(
         })
         .catch(() => {
           localStorage.removeItem('token');
-          localStorage.removeItem('refresh_token');
           localStorage.removeItem('user');
           return null;
         })

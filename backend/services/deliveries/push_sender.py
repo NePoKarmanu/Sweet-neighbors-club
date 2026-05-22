@@ -13,6 +13,21 @@ logger = logging.getLogger(__name__)
 
 
 class PushSender:
+    def send(
+        self,
+        *,
+        push_subscription: PushSubscription,
+        title: str,
+        url: str,
+        price: float | None,
+        user_id: int | None = None,
+    ) -> None:
+        self.send_many(
+            push_subscription=push_subscription,
+            listings=[(title, url, price)],
+            user_id=user_id,
+        )
+    
     def send_many(
         self,
         *,
@@ -23,6 +38,7 @@ class PushSender:
         log_info(
             logger, "Push send attempt started", event="notifications.push_send_attempt",
             channel="push", user_id=user_id, listings_count=len(listings)
+        )
         if not settings.WEB_PUSH_VAPID_PRIVATE_KEY or not settings.WEB_PUSH_VAPID_CLAIMS_SUBJECT:
             raise RuntimeError("Web push is not configured")
         if not listings:
@@ -37,20 +53,6 @@ class PushSender:
             }
         )
         try:
-            if not settings.WEB_PUSH_VAPID_PRIVATE_KEY or not settings.WEB_PUSH_VAPID_CLAIMS_SUBJECT:
-                raise RuntimeError("Web push is not configured")
-            if not listings:
-                raise RuntimeError("No listings to send")
-
-            first_url = listings[0][1]
-            payload = json.dumps(
-                {
-                    "title": "РќРѕРІС‹Рµ РѕР±СЉСЏРІР»РµРЅРёСЏ РЅР°Р№РґРµРЅС‹ РґР»СЏ Р’Р°СЃ!",
-                    "body": f"{len(listings)} РЅРѕРІС‹С… РѕР±СЉСЏРІР»РµРЅРёР№ РґРѕСЃС‚СѓРїРЅРѕ",
-                    "url": first_url,
-                    "urls": [url for _, url, _ in listings],
-                }
-            )
             webpush(
                 subscription_info={
                     "endpoint": push_subscription.endpoint,

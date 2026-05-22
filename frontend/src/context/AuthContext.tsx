@@ -42,7 +42,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(null);
         setUser(null);
         localStorage.removeItem('token');
-        localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
       } finally {
         if (isMounted) setIsLoading(false);
@@ -58,7 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(data.access_token);
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
     localStorage.setItem('user', JSON.stringify(data.user));
   }, []);
 
@@ -79,7 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     window.dispatchEvent(new CustomEvent('auth:logout'));
   }, [token]);

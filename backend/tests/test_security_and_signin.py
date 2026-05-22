@@ -48,7 +48,7 @@ def test_signin_success_with_new_hash() -> None:
     signin_module.create_access_token = MagicMock(return_value="token")
 
     try:
-        response = signin_user(data, db)
+        response, _ = signin_user(data, db)
     finally:
         signin_module.UserRepository = original_repo
         signin_module.create_access_token = original_token_creator
@@ -111,7 +111,7 @@ def test_signup_returns_access_and_refresh_tokens() -> None:
     signup_module.create_refresh_token = MagicMock(return_value="refresh-token")
 
     try:
-        response = signup_user(
+        response, refresh_token = signup_user(
             SignupDTO(email=user.email, phone=user.phone, password="Password123!"),
             db,
         )
@@ -121,7 +121,7 @@ def test_signup_returns_access_and_refresh_tokens() -> None:
         signup_module.create_refresh_token = original_refresh
 
     assert response.access_token == "access-token"
-    assert response.refresh_token == "refresh-token"
+    assert refresh_token == "refresh-token"
     
 
 def test_decode_access_token_rejects_refresh_token() -> None:

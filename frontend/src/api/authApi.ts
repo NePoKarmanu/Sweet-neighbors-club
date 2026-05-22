@@ -30,10 +30,8 @@ export async function signout(token: string): Promise<void> {
   );
 }
 
-export async function refresh(refreshToken: string): Promise<RefreshTokenResponse> {
-  const { data } = await authClient.post<RefreshTokenResponse>('/auth/refresh', {
-    refresh_token: refreshToken,
-  });
+export async function refresh(): Promise<RefreshTokenResponse> {
+  const { data } = await authClient.post<RefreshTokenResponse>('/auth/refresh');
   return data;
 }
 

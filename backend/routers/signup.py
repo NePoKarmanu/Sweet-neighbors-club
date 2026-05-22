@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
@@ -16,4 +17,15 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> TokenRespon
         phone=payload.phone,
         password=payload.password,
     )
-    return signup_user(dto, db)
+    token_response, refresh_token = signup_user(dto, db)
+    response = JSONResponse(content=token_response.model_dump(), status_code=status.HTTP_201_CREATED)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/auth",
+    )
+    return response
+

@@ -12,6 +12,21 @@ logger = logging.getLogger(__name__)
 
 
 class EmailSender:
+    def send(
+        self,
+        *,
+        recipient: str,
+        title: str,
+        url: str,
+        price: float | None,
+        user_id: int | None = None,
+    ) -> None:
+        self.send_many(
+            recipient=recipient,
+            listings=[(title, url, price)],
+            user_id=user_id,
+        )
+
     def send_many(
         self,
         *,

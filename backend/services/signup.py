@@ -10,7 +10,7 @@ from backend.utils.jwt import create_access_token, create_refresh_token
 from backend.utils.security import hash_password
 
 
-def signup_user(data: SignupDTO, db: Session) -> TokenResponse:
+def signup_user(data: SignupDTO, db: Session) -> tuple[TokenResponse, str]:
     users = UserRepository(db)
 
     if users.get_by_email(data.email) is not None:
@@ -26,8 +26,11 @@ def signup_user(data: SignupDTO, db: Session) -> TokenResponse:
         is_staff=False,
     )
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-        user=UserResponse.model_validate(user),
+    refresh_token = create_refresh_token(user.id)
+    return (
+        TokenResponse(
+            access_token=create_access_token(user.id),
+            user=UserResponse.model_validate(user),
+        ),
+        refresh_token,
     )
