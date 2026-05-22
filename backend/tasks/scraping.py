@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from backend.core.celery_app import celery_app
 from backend.db.session import SessionLocal
+from backend.logging_utils import log_exception, log_info
 from backend.scrapers.runner import ScrapeRunResult, run_all_scrapers
+
+logger = logging.getLogger(__name__)
 
 
 def _serialize_result(result: ScrapeRunResult) -> dict:
@@ -31,9 +36,22 @@ def _serialize_result(result: ScrapeRunResult) -> dict:
 def run_all_scrapers_task(self, provider_name: str | None = None) -> dict:
     db: Session = SessionLocal()
     try:
+        log_info(
+            logger, "Scraping task started", event="scraping.task_started",
+            task="scraping.run_all_scrapers_task", task_id=self.request.id, provider_name=provider_name
+        )
         result = run_all_scrapers(db, provider_name=provider_name)
-        return _serialize_result(result)
+        payload = _serialize_result(result)
+        log_info(
+            logger, "Scraping task finished", event="scraping.task_finished",
+            task="scraping.run_all_scrapers_task", task_id=self.request.id, provider_name=provider_name, **payload
+        )
+        return payload
     except Exception:
+        log_exception(
+            logger, "Scraping task failed", event="scraping.task_failed",
+            task="scraping.run_all_scrapers_task", task_id=self.request.id, provider_name=provider_name
+        )
         db.rollback()
         raise
     finally:

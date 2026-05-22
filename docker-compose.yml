@@ -49,6 +49,8 @@ services:
     environment: &backend_env
       DATABASE_URL: ${APP_DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/sweet_neighbors_club}
       REDIS_URL: ${APP_REDIS_URL:-redis://redis:6379/0}
+      LISTING_CACHE_ENABLED: ${LISTING_CACHE_ENABLED:-true}
+      LISTING_CACHE_TTL_SECONDS: ${LISTING_CACHE_TTL_SECONDS:-600}
       CELERY_BROKER_URL: ${APP_CELERY_BROKER_URL:-redis://redis:6379/0}
       CELERY_RESULT_BACKEND: ${APP_CELERY_RESULT_BACKEND:-redis://redis:6379/0}
       CELERY_RESULT_EXPIRES_SECONDS: ${CELERY_RESULT_EXPIRES_SECONDS:-3600}
