@@ -6,7 +6,9 @@ import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-import httpx
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 from backend.core.config import settings
 from backend.scrapers.base import ScrapedListingDTO, ScraperParseError, ScraperRequestError
@@ -58,23 +60,28 @@ class DomclickScraper:
         return headers
 
     def scrape(self) -> list[ScrapedListingDTO]:
+        headers = self._build_headers()
+        timeout_ms = int(self.timeout_seconds * 1000)
         try:
-            with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True) as client:
-                response = client.get(self.search_url, headers=self._build_headers())
-        except httpx.HTTPError as exc:
+            with sync_playwright() as playwright:
+                browser = playwright.firefox.launch(headless=True)
+                context = browser.new_context(user_agent=headers["User-Agent"])
+                if self.cookie:
+                    context.add_cookies(_parse_cookies_header(self.cookie, self.search_url))
+                page = context.new_page()
+                page.goto(self.search_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                page.wait_for_selector("script", timeout=timeout_ms)
+                html = page.content()
+                context.close()
+                browser.close()
+        except (PlaywrightTimeoutError, PlaywrightError) as exc:
             raise ScraperRequestError(f"Domclick request failed: {exc}") from exc
 
-        if response.status_code in {401, 403, 429}:
-            raise ScraperRequestError(
-                f"Domclick blocked request with status {response.status_code}"
-            )
-        if response.status_code >= 400:
-            raise ScraperRequestError(f"Domclick returned status {response.status_code}")
-        lowered = response.text.lower()
+        lowered = html.lower()
         if "qrator" in lowered or "captcha" in lowered:
             raise ScraperRequestError("Domclick returned antibot/captcha page")
 
-        return self.parse(response.text)
+        return self.parse(html)
 
     def parse(self, html: str) -> list[ScrapedListingDTO]:
         state = _extract_ssr_state(html)
@@ -213,6 +220,27 @@ def _extract_city_from_url(base_url: str) -> str | None:
     if len(parts) >= 3 and parts[0]:
         return parts[0]
     return None
+
+def _parse_cookies_header(cookie_header: str, url: str) -> list[dict[str, str]]:
+    domain = urlparse(url).hostname or "voronezh.domclick.ru"
+    cookies: list[dict[str, str]] = []
+    for raw_part in cookie_header.split(";"):
+        part = raw_part.strip()
+        if not part or "=" not in part:
+            continue
+        name, value = part.split("=", 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append(
+            {
+                "name": name,
+                "value": value.strip(),
+                "domain": domain,
+                "path": "/",
+            }
+        )
+    return cookies
 
 
 def _to_string(value: Any) -> str | None:

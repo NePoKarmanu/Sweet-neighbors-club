@@ -393,3 +393,23 @@ def _mark_group_failed(*, group: list[Any], delivery_repository: NotificationDel
         processed += 1
         pending_changes += 1
     return processed, pending_changes
+
+def send_test_push_notification(db: Session, *, user_id: int, message: str = "привет") -> dict[str, object]:
+    push_repository = PushSubscriptionRepository(db)
+    push_sender = PushSender()
+    push_subscription = push_repository.get_any_active_for_user(user_id=user_id)
+    if push_subscription is None:
+        return {"sent": False, "reason": "No active push subscription"}
+
+    try:
+        push_sender.send_many(
+            push_subscription=push_subscription,
+            listings=[(message, "https://example.com", None)],
+        )
+        return {"sent": True, "user_id": user_id}
+    except WebPushException as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code in {404, 410}:
+            push_repository.deactivate_by_endpoint(endpoint=push_subscription.endpoint)
+        return {"sent": False, "reason": str(exc), "user_id": user_id}
+

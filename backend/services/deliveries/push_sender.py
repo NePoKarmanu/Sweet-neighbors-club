@@ -23,10 +23,9 @@ class PushSender:
         first_url = listings[0][1]
         payload = json.dumps(
             {
-                "title": "Новые объявления найдены для Вас!",
-                "body": f"{len(listings)} новых объявлений доступно",
+                "title": "Новые объявления",
+                "body": "Появились новые объявления, проверьте почту",
                 "url": first_url,
-                "urls": [url for _, url, _ in listings],
             }
         )
         webpush(

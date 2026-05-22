@@ -9,6 +9,7 @@ from backend.services.notification_pipeline import (
     match_listings_to_subscriptions,
     materialize_pending_deliveries,
     process_pending_deliveries,
+    send_test_push_notification,
 )
 
 
@@ -81,3 +82,12 @@ def run_full_pipeline_task(self, user_id: int | None = None) -> dict:
         }
     finally:
         db.close()
+
+@celery_app.task(bind=True, name="notifications.send_test_push_task")
+def send_test_push_task(self, user_id: int) -> dict:
+    db: Session = SessionLocal()
+    try:
+        return send_test_push_notification(db, user_id=user_id, message="привет")
+    finally:
+        db.close()
+

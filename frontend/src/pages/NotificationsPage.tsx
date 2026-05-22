@@ -193,14 +193,30 @@ const NotificationsPage: React.FC = () => {
         return;
       }
 
-      const permission = await Notification.requestPermission();
+      if (!window.isSecureContext) {
+        alert('Push-уведомления работают только в защищённом контексте (HTTPS или localhost)');
+        return;
+      }
+
+      if (Notification.permission === 'denied') {
+        alert('Разрешение на уведомления заблокировано в браузере. Разрешите уведомления в настройках сайта.');
+        return;
+      }
+
+      const permission =
+        Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
       if (permission === 'granted') {
         try {
           const registration = await navigator.serviceWorker.register('/sw.js');
-          const pushSubscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: base64UrlToUint8Array(PUSH_PUBLIC_KEY) as BufferSource,
-          });
+          const existingSubscription = await registration.pushManager.getSubscription();
+          const pushSubscription = existingSubscription
+            ? existingSubscription
+            : await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: base64UrlToUint8Array(PUSH_PUBLIC_KEY) as BufferSource,
+              });
           const key = pushSubscription.getKey('p256dh');
           const auth = pushSubscription.getKey('auth');
           if (!key || !auth) {
@@ -218,9 +234,9 @@ const NotificationsPage: React.FC = () => {
           alert('Не удалось зарегистрировать push-подписку');
           return;
         }
-        setChannels(prev => [...prev, 'push']);
+        setChannels(prev => (prev.includes('push') ? prev : [...prev, 'push']));
       } else {
-        alert('Разрешение не получено');
+        alert('Не удалось получить разрешение на уведомления');
       }
       return;
     }
