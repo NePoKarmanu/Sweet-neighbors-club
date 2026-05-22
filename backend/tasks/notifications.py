@@ -22,6 +22,7 @@ def match_listings_task(self, user_id: int | None = None) -> dict:
             batch_size=settings.NOTIFICATIONS_MATCHER_BATCH_SIZE,
             user_id=user_id,
         )
+        db.commit()
         return {"created_notifications": created, "user_id": user_id}
     finally:
         db.close()
@@ -36,6 +37,7 @@ def materialize_deliveries_task(self, user_id: int | None = None) -> dict:
             batch_size=settings.NOTIFICATIONS_MATCHER_BATCH_SIZE,
             user_id=user_id,
         )
+        db.commit()
         return {"created_deliveries": created, "user_id": user_id}
     finally:
         db.close()

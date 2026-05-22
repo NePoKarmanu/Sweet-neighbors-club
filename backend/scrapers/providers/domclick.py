@@ -6,9 +6,7 @@ import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
+import httpx
 
 from backend.core.config import settings
 from backend.scrapers.base import ScrapedListingDTO, ScraperParseError, ScraperRequestError
@@ -38,7 +36,7 @@ class DomclickScraper:
             "Accept-Language": "ru,ru-RU;q=0.9,en-US;q=0.8,en;q=0.7",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Cookie": "region={%22data%22:{%22name%22:%22%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6%22%2C%22regionGuid%22:%2270725a3f-da87-4116-a9ca-7bf45cefdfea%22%2C%22localityGuid%22:%22a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1%22%2C%22subdomain%22:%22voronezh%22}%2C%22isAutoResolved%22:true}; canary-bind-id-14003=prev-0; qrator_jsid2=v2.0.1779441334.347.bceb14e59xeOfjGK|HXm3fMFUMlGurl4c|lsdDG1EYiQh/1PrL+kvD13xl2xSCwValuBE88/zwTawoTHF93jJYNYXCP5zYVEBC/oPZrtNyc6WVTdIcyZbYjDdnyUgBwHpNtKdD+q/gXtm4dT2xKYEyY8YuM8ncpECqEscL1xxceVC4lKkEVX+G2U1qerwoRThghObynM9c6Zo=-o/XJkNiDmUmfhc7fWlqtxHrvnbg=; _sa=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337; autoDefinedRegion=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:70725a3f-da87-4116-a9ca-7bf45cefdfea:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6:voronezh; currentLocalityGuid=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1; currentRegionGuid=70725a3f-da87-4116-a9ca-7bf45cefdfea; dddIntroOnline=false; iosAppLink=; logoSuffix=; ns_session=38dceb26-8397-43c9-b5f0-27eeac3c8be8; regionName=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6; showDddIntro=false; RETENTION_COOKIES_NAME=f26f004736f64300ac9008513702e4df:7SrGsupkIzJAsf55rtYoP5fU2Vw; sessionId=b0eec26838b74f60a48994ea1a0f7da9:Tn3WB1lGZdGovTLiaB4lFt46fVQ; UNIQ_SESSION_ID=fa90fcd39f0c4a41a18d797610d3b941:n2BnZJvbpjL3OdLQhtlYDHme4HQ; _visitId=1dfdb396-09db-409d-ab16-e8d5f5bb155c-8cd1520ebd0d580d; _sas.2c534172f17069dd8844643bb4eb639294cd4a7a61de799648e70dc86bc442b9=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779442361; _sas=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779442361",
+            "Cookie": "region={%22data%22:{%22name%22:%22%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6%22%2C%22regionGuid%22:%2270725a3f-da87-4116-a9ca-7bf45cefdfea%22%2C%22localityGuid%22:%22a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1%22%2C%22subdomain%22:%22voronezh%22}%2C%22isAutoResolved%22:true}; canary-bind-id-14003=prev-0; project-3518=1322660-2; qrator_jsid2=v2.0.1779457256.998.bceb14e54Y94fum1|mMaOwolvCblVevoX|vWwdnqvneRukHGB2H0bdgJHkl+SbHBCy3adRUvKaQVPF5T+RW76JPANz9ZrtvQF9IySKDzQf+MYPBIbABBywDxzhEHBKfcScv8CvO+PdxpU/7ahPFHcEyASSYlt/pu5BvTp2kV99XSIwk2eo0HrOgH7QPblWh32b2rnPOaBm4s8=-JuiKRJvJ51MbT6KQa6f5jx4tdOY=; qrato_jsr=v2.0.1779457256.998.bceb14e54Y94fum1|J2h7SIowwqSZiFMY|ry0VTam9ZvFVmmI0x2Xw89dUx+GWYFGi7jlEEzko8jhKvvHlwSjdJPyG4gKN0nLeK4YJSsVc/kAWnodGk0wrdA==-nNv4Q+AtkG40rAdeWlwBqWHkeY4=-00; qrator_ssid2=v2.0.1779457257.501.bceb14e5RgkWvDey|4qs7XpKqYzyO6D2B|DE68pqHtByV13ciw+GYcXt3nyBGgK0/nRU4/38ekdJzOOIrPiVYP99Eb5MUCWu5uF1tv1sae8O0V+MPBcEbYGQ==-x+as8VCeA5hZT3OnNru+QdgflH8=; _sa=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337; autoDefinedRegion=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:70725a3f-da87-4116-a9ca-7bf45cefdfea:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6:voronezh; currentLocalityGuid=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1; currentRegionGuid=70725a3f-da87-4116-a9ca-7bf45cefdfea; dddIntroOnline=false; iosAppLink=; logoSuffix=; ns_session=38dceb26-8397-43c9-b5f0-27eeac3c8be8; regionName=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6; showDddIntro=false; RETENTION_COOKIES_NAME=f26f004736f64300ac9008513702e4df:7SrGsupkIzJAsf55rtYoP5fU2Vw; sessionId=b0eec26838b74f60a48994ea1a0f7da9:Tn3WB1lGZdGovTLiaB4lFt46fVQ; UNIQ_SESSION_ID=fa90fcd39f0c4a41a18d797610d3b941:n2BnZJvbpjL3OdLQhtlYDHme4HQ; _visitId=5e13c2cb-a6bc-43bf-af61-5b1be80c492f-8cd1520ebd0d580d; _sas.2c534172f17069dd8844643bb4eb639294cd4a7a61de799648e70dc86bc442b9=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779457260; _sas=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779442361",
             "DNT": "1",
             "Host": "voronezh.domclick.ru",
             "Pragma": "no-cache",
@@ -60,28 +58,23 @@ class DomclickScraper:
         return headers
 
     def scrape(self) -> list[ScrapedListingDTO]:
-        headers = self._build_headers()
-        timeout_ms = int(self.timeout_seconds * 1000)
         try:
-            with sync_playwright() as playwright:
-                browser = playwright.firefox.launch(headless=True)
-                context = browser.new_context(user_agent=headers["User-Agent"])
-                if self.cookie:
-                    context.add_cookies(_parse_cookies_header(self.cookie, self.search_url))
-                page = context.new_page()
-                page.goto(self.search_url, wait_until="domcontentloaded", timeout=timeout_ms)
-                page.wait_for_selector("script", timeout=timeout_ms)
-                html = page.content()
-                context.close()
-                browser.close()
-        except (PlaywrightTimeoutError, PlaywrightError) as exc:
+            with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True) as client:
+                response = client.get(self.search_url, headers=self._build_headers())
+        except httpx.HTTPError as exc:
             raise ScraperRequestError(f"Domclick request failed: {exc}") from exc
 
-        lowered = html.lower()
+        if response.status_code in {401, 403, 429}:
+            raise ScraperRequestError(
+                f"Domclick blocked request with status {response.status_code}"
+            )
+        if response.status_code >= 400:
+            raise ScraperRequestError(f"Domclick returned status {response.status_code}")
+        lowered = response.text.lower()
         if "qrator" in lowered or "captcha" in lowered:
             raise ScraperRequestError("Domclick returned antibot/captcha page")
 
-        return self.parse(html)
+        return self.parse(response.text)
 
     def parse(self, html: str) -> list[ScrapedListingDTO]:
         state = _extract_ssr_state(html)
@@ -128,10 +121,7 @@ class DomclickScraper:
         if external_id is None or path is None:
             return None
 
-        image_url = _build_dmclk_image_url(entity=entity, dmclk_template=dmclk_template) or _extract_image_url(
-            entity=entity,
-            base_url=self.base_url,
-        )
+        image_url = _build_dmclk_image_url(entity=entity, dmclk_template=dmclk_template)
 
         title = _build_title(entity)
         published_at = _to_datetime(entity.get("publishedDate") or entity.get("updatedDate"))
@@ -295,28 +285,29 @@ def _build_dmclk_image_url(*, entity: dict[str, Any], dmclk_template: str | None
     photos = entity.get("photos")
     if not isinstance(photos, list) or not photos or not isinstance(photos[0], dict):
         return None
-    raw_url = _to_string(photos[0].get("url"))
-    if raw_url is None:
-        return None
-    normalized = raw_url.strip("/")
-    if not normalized:
-        return None
-    image_path = re.sub(r"\.(jpg|jpeg|png|webp)$", "", normalized, flags=re.IGNORECASE)
-    return dmclk_template.format(image_path=image_path)
-
-
-def _extract_image_url(*, entity: dict[str, Any], base_url: str) -> str | None:
-    photos = entity.get("photos")
-    if not isinstance(photos, list) or not photos or not isinstance(photos[0], dict):
-        return None
+    
 
     photo = photos[0]
     for key in ("url", "fullUrl", "originUrl", "src"):
-        image_url = _to_string(photo.get(key))
-        if image_url is None:
+        image_path = _extract_dmclk_image_path(photo.get(key))
+        if image_path is None:
             continue
-        return urljoin(base_url, image_url)
+        return dmclk_template.format(image_path=image_path)
     return None
+
+def _extract_dmclk_image_path(value: Any) -> str | None:
+    raw = _to_string(value)
+    if raw is None:
+        return None
+
+    match = re.search(r"(?:^|/)vitrina/(.+?)(?:\.(?:jpg|jpeg|png|webp))?$", raw, flags=re.IGNORECASE)
+    if match is not None:
+        return match.group(1).strip("/") or None
+
+    normalized = raw.strip("/")
+    if not normalized:
+        return None
+    return re.sub(r"\.(jpg|jpeg|png|webp)$", "", normalized, flags=re.IGNORECASE)
 
 def _build_title(entity: dict[str, Any]) -> str:
     object_info = entity.get("objectInfo") if isinstance(entity.get("objectInfo"), dict) else {}

@@ -159,16 +159,28 @@ def materialize_pending_deliveries(
     delivery_repository = NotificationDeliveryRepository(db)
     push_repository = PushSubscriptionRepository(db)
 
-    notifications = notification_repository.list_unprocessed(limit=batch_size)
     filters_with_subscriptions = subscription_repository.list_active_with_subscriptions(user_id=user_id)
     subscriptions_by_user = {subscription.user_id: subscription for _, subscription in filters_with_subscriptions}
-    return _materialize_deliveries_for_notifications(
-        notifications=notifications,
-        subscriptions_by_user=subscriptions_by_user,
-        delivery_repository=delivery_repository,
-        push_repository=push_repository,
-        user_id=user_id,
-    )
+    created = 0
+    offset = 0
+    scan_limit = max(batch_size, 100)
+
+    while True:
+        notifications = notification_repository.list_unprocessed(limit=scan_limit, offset=offset)
+        if not notifications:
+            break
+        created += _materialize_deliveries_for_notifications(
+            notifications=notifications,
+            subscriptions_by_user=subscriptions_by_user,
+            delivery_repository=delivery_repository,
+            push_repository=push_repository,
+            user_id=user_id,
+        )
+        if created >= batch_size:
+            break
+        offset += len(notifications)
+
+    return created
 
 
 def _materialize_deliveries_for_notifications(
