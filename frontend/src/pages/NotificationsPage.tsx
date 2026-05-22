@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
 import { useAuth } from '../context/AuthContext';
 import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
 
 const PROPERTY_TYPES_OPTIONS = ['flat', 'room', 'house', 'townhouse', 'apartment'];
 const CREATOR_TYPES_OPTIONS = ['agency', 'owner'];
-const LIVING_CONDITIONS_OPTIONS = ['mortgage', 'maternal_capital', 'bargain', 'exchange'];
 
 const PROPERTY_LABELS: Record<string, string> = {
   flat: 'Квартира',
@@ -19,14 +19,8 @@ const CREATOR_LABELS: Record<string, string> = {
   owner: 'Собственник',
 };
 
-const LIVING_CONDITIONS_LABELS: Record<string, string> = {
-  mortgage: 'Ипотека',
-  maternal_capital: 'Маткапитал',
-  bargain: 'Торг',
-  exchange: 'Обмен',
-};
-
 interface NotificationSettings {
+  city: string;
   channels: string[];
   roomsMin: string;
   roomsMax: string;
@@ -41,10 +35,20 @@ interface NotificationSettings {
   selectedPropertyTypes: string[];
   selectedCreatorTypes: string[];
   hasRepair: boolean | undefined;
-  selectedLivingConditions: string[];
 }
 
 const NOTIFY_STORAGE_KEY = 'notification_settings';
+const CITY_LABEL = 'Воронеж';
+const CITY_BACKEND_VALUE = 'voronezh';
+
+const PUSH_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
+const base64UrlToUint8Array = (base64Url: string): Uint8Array => {
+  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+};
 
 const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -57,9 +61,9 @@ const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
 
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [city, setCity] = useState(CITY_BACKEND_VALUE);
   const [channels, setChannels] = useState<string[]>([]);
+
   const [roomsMin, setRoomsMin] = useState('');
   const [roomsMax, setRoomsMax] = useState('');
   const [priceMin, setPriceMin] = useState('');
@@ -73,7 +77,6 @@ const NotificationsPage: React.FC = () => {
   const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>([]);
   const [selectedCreatorTypes, setSelectedCreatorTypes] = useState<string[]>([]);
   const [hasRepair, setHasRepair] = useState<boolean | undefined>(undefined);
-  const [selectedLivingConditions, setSelectedLivingConditions] = useState<string[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem(NOTIFY_STORAGE_KEY);
@@ -81,6 +84,7 @@ const NotificationsPage: React.FC = () => {
 
     try {
       const settings: NotificationSettings = JSON.parse(saved);
+      setCity(settings.city || CITY_BACKEND_VALUE);
       setChannels(settings.channels || []);
       setRoomsMin(settings.roomsMin || '');
       setRoomsMax(settings.roomsMax || '');
@@ -95,9 +99,9 @@ const NotificationsPage: React.FC = () => {
       setSelectedPropertyTypes(settings.selectedPropertyTypes || []);
       setSelectedCreatorTypes(settings.selectedCreatorTypes || []);
       setHasRepair(settings.hasRepair);
-      setSelectedLivingConditions(settings.selectedLivingConditions || []);
     } catch {
-      localStorage.removeItem(NOTIFY_STORAGE_KEY);
+      setCity(CITY_BACKEND_VALUE);
+      setChannels([]);
     }
   }, []);
   const subscribePushIfNeeded = async (): Promise<void> => {
@@ -142,7 +146,9 @@ const NotificationsPage: React.FC = () => {
     setError('');
     setMessage('');
 
+  const handleSave = async () => {
     const toSave: NotificationSettings = {
+      city,
       channels,
       roomsMin,
       roomsMax,
@@ -157,27 +163,41 @@ const NotificationsPage: React.FC = () => {
       selectedPropertyTypes,
       selectedCreatorTypes,
       hasRepair,
-      selectedLivingConditions,
     };
-    try {
-      localStorage.setItem(NOTIFY_STORAGE_KEY, JSON.stringify(toSave));
 
+    localStorage.setItem(NOTIFY_STORAGE_KEY, JSON.stringify(toSave));
+
+    const parseRange = (min: string, max: string) => {
+      const parsedMin = min.trim() === '' ? undefined : Number(min);
+      const parsedMax = max.trim() === '' ? undefined : Number(max);
+      if (parsedMin === undefined && parsedMax === undefined) return undefined;
+      return { min: parsedMin, max: parsedMax };
+    };
+
+    try {
       await createNotificationSettings({
-        city: 'Москва',
+        city: CITY_BACKEND_VALUE,
         notify_email: channels.includes('email'),
         notify_push: channels.includes('push'),
+        property_types: selectedPropertyTypes.length ? selectedPropertyTypes : undefined,
+        creator_types: selectedCreatorTypes.length
+          ? (selectedCreatorTypes as Array<'agency' | 'owner'>)
+          : undefined,
+        has_furniture: hasRepair,
+        price: parseRange(priceMin, priceMax),
+        area: parseRange(areaMin, areaMax),
+        rooms: parseRange(roomsMin, roomsMax),
+        floor: parseRange(floorMin, floorMax),
+        build_year: parseRange(buildYearMin, buildYearMax),
       });
-
-      await subscribePushIfNeeded();
       setMessage('Настройки сохранены');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Не удалось сохранить настройки');
-    } finally {
-      setIsSaving(false);
+    } catch {
+      setMessage('Не удалось сохранить настройки');
     }
   };
 
   const handleReset = () => {
+    setCity(CITY_BACKEND_VALUE);
     setChannels([]);
     setRoomsMin('');
     setRoomsMax('');
@@ -192,23 +212,87 @@ const NotificationsPage: React.FC = () => {
     setSelectedPropertyTypes([]);
     setSelectedCreatorTypes([]);
     setHasRepair(undefined);
-    setSelectedLivingConditions([]);
-
     localStorage.removeItem(NOTIFY_STORAGE_KEY);
     setMessage('Настройки сброшены');
     setError('');
   };
+
   const toggleArray = (
     value: string,
     array: string[],
     setter: React.Dispatch<React.SetStateAction<string[]>>,
   ) => {
     if (array.includes(value)) {
-      setter(array.filter((v) => v !== value));
+      setter(array.filter(v => v !== value));
+    } else {
+      setter([...array, value]);
+    }
+  };
+
+  const handlePushToggle = async (checked: boolean) => {
+    if (checked) {
+      if (!('Notification' in window)) {
+        alert('Браузер не поддерживает уведомления');
+        return;
+      }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('Push-уведомления не поддерживаются в этом браузере');
+        return;
+      }
+      if (!PUSH_PUBLIC_KEY) {
+        alert('VAPID public key не настроен');
+        return;
+      }
+
+      if (!window.isSecureContext) {
+        alert('Push-уведомления работают только в защищённом контексте (HTTPS или localhost)');
+        return;
+      }
+
+      if (Notification.permission === 'denied') {
+        alert('Разрешение на уведомления заблокировано в браузере. Разрешите уведомления в настройках сайта.');
+        return;
+      }
+
+      const permission =
+        Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
+      if (permission === 'granted') {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          const existingSubscription = await registration.pushManager.getSubscription();
+          const pushSubscription = existingSubscription
+            ? existingSubscription
+            : await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: base64UrlToUint8Array(PUSH_PUBLIC_KEY) as BufferSource,
+              });
+          const key = pushSubscription.getKey('p256dh');
+          const auth = pushSubscription.getKey('auth');
+          if (!key || !auth) {
+            alert('Не удалось получить push ключи подписки');
+            return;
+          }
+
+          await createPushSubscription({
+            endpoint: pushSubscription.endpoint,
+            p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
+            auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
+            user_agent: navigator.userAgent,
+          });
+        } catch {
+          alert('Не удалось зарегистрировать push-подписку');
+          return;
+        }
+        setChannels(prev => (prev.includes('push') ? prev : [...prev, 'push']));
+      } else {
+        alert('Не удалось получить разрешение на уведомления');
+      }
       return;
     }
 
-    setter([...array, value]);
+    setChannels(prev => prev.filter(c => c !== 'push'));
   };
 
   if (!user) {
@@ -220,14 +304,24 @@ const NotificationsPage: React.FC = () => {
       <h1>Настройки уведомлений</h1>
 
       <section>
+        <h2>Город</h2>
+        <div className="filter-group">
+          <label htmlFor="notifications-city">Выберите город</label>
+          <select id="notifications-city" value={city} onChange={e => setCity(e.target.value)}>
+            <option value={CITY_BACKEND_VALUE}>{CITY_LABEL}</option>
+          </select>
+        </div>
+      </section>
+
+      <section>
         <h2>Каналы доставки</h2>
         <label className="checkbox-label">
           <input
             type="checkbox"
             checked={channels.includes('email')}
-            onChange={(e) => {
-              if (e.target.checked) setChannels((prev) => [...prev, 'email']);
-              else setChannels((prev) => prev.filter((c) => c !== 'email'));
+            onChange={e => {
+              if (e.target.checked) setChannels(prev => [...prev, 'email']);
+              else setChannels(prev => prev.filter(c => c !== 'email'));
             }}
           />
           Электронная почта
@@ -237,10 +331,7 @@ const NotificationsPage: React.FC = () => {
           <input
             type="checkbox"
             checked={channels.includes('push')}
-            onChange={(e) => {
-              if (e.target.checked) setChannels((prev) => [...prev, 'push']);
-              else setChannels((prev) => prev.filter((c) => c !== 'push'));
-            }}
+            onChange={e => handlePushToggle(e.target.checked)}
           />
           Push-уведомления
         </label>
@@ -348,20 +439,6 @@ const NotificationsPage: React.FC = () => {
             </label>
           </div>
         </div>
-
-        <div className="filter-group">
-          <label>Условия</label>
-          {LIVING_CONDITIONS_OPTIONS.map((cond) => (
-            <label key={cond} className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={selectedLivingConditions.includes(cond)}
-                onChange={() => toggleArray(cond, selectedLivingConditions, setSelectedLivingConditions)}
-              />
-              {LIVING_CONDITIONS_LABELS[cond]}
-            </label>
-          ))}
-        </div>
       </section>
 
       <div style={{ marginTop: '20px' }}>
@@ -373,7 +450,6 @@ const NotificationsPage: React.FC = () => {
         </button>
       </div>
 
-      {error && <p style={{ marginTop: '1rem', textAlign: 'center', color: '#d32f2f' }}>{error}</p>}
       {message && <p style={{ marginTop: '1rem', textAlign: 'center', color: '#2e7d32' }}>{message}</p>}
     </div>
   );

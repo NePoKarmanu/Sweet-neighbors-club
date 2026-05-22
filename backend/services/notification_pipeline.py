@@ -20,10 +20,39 @@ from backend.services.deliveries.email_sender import EmailSender
 from backend.services.deliveries.push_sender import PushSender, WebPushException
 
 
+def _normalize_city(value: str) -> str:
+    normalized = value.strip().casefold()
+    aliases = {
+        "voronezh": "воронеж",
+        "vоронеж": "воронеж",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _to_number_or_none(value: Any) -> float | int | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().replace(",", ".")
+        if normalized == "":
+            return None
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    return None
+
+
 def _fits_range(value: float | int | None, minimum: float | int | None, maximum: float | int | None) -> bool:
-    if minimum is not None and (value is None or value < minimum):
+    value_num = _to_number_or_none(value)
+    minimum_num = _to_number_or_none(minimum)
+    maximum_num = _to_number_or_none(maximum)
+
+    if minimum_num is not None and (value_num is None or value_num < minimum_num):
         return False
-    if maximum is not None and (value is None or value > maximum):
+    if maximum_num is not None and (value_num is None or value_num > maximum_num):
         return False
     return True
 
@@ -44,7 +73,7 @@ def _matches_listing(search_filter: SearchFilter, listing_data: dict[str, Any]) 
         listing_city = listing_data.get("city")
         if not isinstance(listing_city, str):
             return False
-        if listing_city.casefold() != search_filter.city.casefold():
+        if _normalize_city(listing_city) != _normalize_city(search_filter.city):
             return False
 
     property_types = params.get("property_types") or []
@@ -62,7 +91,10 @@ def _matches_listing(search_filter: SearchFilter, listing_data: dict[str, Any]) 
             return False
 
     has_furniture = params.get("has_furniture")
-    if has_furniture is not None and details.get("has_furniture") is not has_furniture:
+    listing_has_furniture = details.get("has_furniture")
+    if listing_has_furniture is None:
+        listing_has_furniture = details.get("has_repair")
+    if has_furniture is not None and listing_has_furniture is not None and listing_has_furniture is not has_furniture:
         return False
 
     build_year_filter = params.get("build_year") or {}
@@ -127,16 +159,28 @@ def materialize_pending_deliveries(
     delivery_repository = NotificationDeliveryRepository(db)
     push_repository = PushSubscriptionRepository(db)
 
-    notifications = notification_repository.list_unprocessed(limit=batch_size)
     filters_with_subscriptions = subscription_repository.list_active_with_subscriptions(user_id=user_id)
     subscriptions_by_user = {subscription.user_id: subscription for _, subscription in filters_with_subscriptions}
-    return _materialize_deliveries_for_notifications(
-        notifications=notifications,
-        subscriptions_by_user=subscriptions_by_user,
-        delivery_repository=delivery_repository,
-        push_repository=push_repository,
-        user_id=user_id,
-    )
+    created = 0
+    offset = 0
+    scan_limit = max(batch_size, 100)
+
+    while True:
+        notifications = notification_repository.list_unprocessed(limit=scan_limit, offset=offset)
+        if not notifications:
+            break
+        created += _materialize_deliveries_for_notifications(
+            notifications=notifications,
+            subscriptions_by_user=subscriptions_by_user,
+            delivery_repository=delivery_repository,
+            push_repository=push_repository,
+            user_id=user_id,
+        )
+        if created >= batch_size:
+            break
+        offset += len(notifications)
+
+    return created
 
 
 def _materialize_deliveries_for_notifications(
@@ -361,3 +405,23 @@ def _mark_group_failed(*, group: list[Any], delivery_repository: NotificationDel
         processed += 1
         pending_changes += 1
     return processed, pending_changes
+
+def send_test_push_notification(db: Session, *, user_id: int, message: str = "привет") -> dict[str, object]:
+    push_repository = PushSubscriptionRepository(db)
+    push_sender = PushSender()
+    push_subscription = push_repository.get_any_active_for_user(user_id=user_id)
+    if push_subscription is None:
+        return {"sent": False, "reason": "No active push subscription"}
+
+    try:
+        push_sender.send_many(
+            push_subscription=push_subscription,
+            listings=[(message, "https://example.com", None)],
+        )
+        return {"sent": True, "user_id": user_id}
+    except WebPushException as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code in {404, 410}:
+            push_repository.deactivate_by_endpoint(endpoint=push_subscription.endpoint)
+        return {"sent": False, "reason": str(exc), "user_id": user_id}
+

@@ -8,7 +8,9 @@ from typing import Any
 from urllib.parse import urljoin
 from urllib.parse import urlparse
 
-import httpx
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 from backend.core.config import settings
 from backend.scrapers.base import ScrapedListingDTO, ScraperParseError, ScraperRequestError
@@ -33,20 +35,26 @@ class AvitoScraper:
 
     def scrape(self) -> list[ScrapedListingDTO]:
         headers = self._build_headers()
+        timeout_ms = int(self.timeout_seconds * 1000)
         try:
-            with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True) as client:
-                response = client.get(self.search_url, headers=headers)
-        except httpx.HTTPError as exc:
+            with sync_playwright() as playwright:
+                browser = playwright.firefox.launch(headless=True)
+                context = browser.new_context(user_agent=headers["User-Agent"])
+                if self.cookie:
+                    context.add_cookies(_parse_cookies_header(self.cookie, self.search_url))
+                page = context.new_page()
+                page.goto(self.search_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                page.wait_for_selector('[data-marker="item"]', timeout=timeout_ms)
+                html_text = page.content()
+                context.close()
+                browser.close()
+        except (PlaywrightTimeoutError, PlaywrightError) as exc:
             raise ScraperRequestError(f"Avito request failed: {exc}") from exc
 
-        if response.status_code in {403, 429}:
-            raise ScraperRequestError(f"Avito blocked request with status {response.status_code}")
-        if response.status_code >= 400:
-            raise ScraperRequestError(f"Avito returned status {response.status_code}")
-        if self._looks_like_captcha(response.text):
-            raise ScraperRequestError("Avito returned captcha page")
+        #if self._looks_like_captcha(html_text):
+            #raise ScraperRequestError("Avito returned captcha page")
 
-        return self.parse(response.text)
+        return self.parse(html_text)
 
     def parse(self, html_text: str) -> list[ScrapedListingDTO]:
         parsed_at = datetime.now(timezone.utc)
@@ -76,16 +84,13 @@ class AvitoScraper:
             "Accept-Language": "ru,ru-RU;q=0.9,en-US;q=0.8,en;q=0.7",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Cookie": self.cookie or "",
+            "Cookie": "sx; sx; cookie_consent_shown=1; sx; SEARCH_HISTORY_IDS=1%2C4%2C; selected_locale=ru-RU; buyer_from_page=catalog; srv_id=p_yxx5WIWhi8XIk6.r3GW6i8iB7pu_60Y9Pip2TRN-WFmrX_xHv6JGxY-GqB5NsdyJRJoxA9SEQ9F39zUARTo.idceF8MtDLMboZWO_8DS-IJw5EOVkgXg9yzCh9eDTmc=.web; _adcc=2.MQ/VecSAW2Tc5KdDv92bG+CJkakA6dzjZ9fIMgosZLGkwPUxiR1TRi51si4uiOZ4cmUWyvWdM36nszBcdfEriHNRQ0KosMIqULjHA/URMxOB9TLykvlNmwIq7BxzhYEYyK9IZ2EwFXB5OonxmjDalsmITbO/; u=3bok4jtk.1gf1vj9.1l5zqrvhwsk0; v=1779440920; cssid=5a78270c-63b7-4183-8f17-e30769f3e196; buyer_location_id=625810; csprefid=64d48552-c7a8-444e-9af8-1d1a78d0b1a1; cssid_exp=1779442723754; luri=voronezh; sx=H4sIAAAAAAAC/6pWMjFMTEk2SEu1SLRIMTa2NDFKs0xNMzczMUkztTQzNktRsqpWKlOyUvINSHXMMI1KCjcLLPdPySlR0lFKVbIyNDe3NDUytzQ3ra0FBAAA//8jLi28TAAAAA==; f=5.0c4f4b6d233fb90636b4dd61b04726f147e1eada7172e06c47e1eada7172e06c47e1eada7172e06c47e1eada7172e06cb59320d6eb6303c1b59320d6eb6303c1b59320d6eb6303c147e1eada7172e06c8a38e2c5b3e08b898a38e2c5b3e08b890df103df0c26013a7b0d53c7afc06d0b2ebf3cb6fd35a0ac7b0d53c7afc06d0b0df103df0c26013ae2bfa4611aac769efa4d7ea84258c63d74c4a16376f87ccd164b09365f5308e7f12b79bbb67ac37d34d62295fceb188d46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9fa46b8ae4e81acb9faf5b2e7701475d0f8352c31daf983fa077a7b6c33f74d335cfa601f10c363b543953cc22f15e8abc602c730c0109b9fbbc356e17b0dce01ea90e8aac858442de29154f4aaf0a7b4f48f10b78f884930fa48ded966eb8e3c6e46b8ae4e81acb9fa46b8ae4e81acb9fa02c68186b443a7ac4fb676a7b5ee221228bf1e74f86dc6052da10fb74cac1eab2da10fb74cac1eabc7bcb3d5c63c9a582f4a9c22eedccd9675dded44b42a0d02; gMltIuegZN2COuSe=EOFGWsm50bhh17prLqaIgdir1V0kgrvN; ft=%229BZlh0PQfvq1AiiUgYWnXCzodwfLD7UHYcSm2xEV1jkghToGN20LtREysA+HDJNojyYl1+cE6r5xEOJHGUdOyHGLc2I/Ky9gQcl1myy21UBp+4+UdpxyUcUkFP57/LabZi6vrzPg/7wNhM7wnMEy0Q==%22",
             "DNT": "1",
             "Host": "www.avito.ru",
             "Pragma": "no-cache",
             "Priority": "u=0, i",
             "Referer": (
-                "https://www.avito.ru/voronezh/kvartiry/sdam/na_dlitelnyy_srok/"
-                "ASgBAgECAkSSA8gQ8AeQUgFFxpoMFXsiZnJvbSI6MCwidG8iOjIwMDAwfQ?"
-                "context=H4sIAAAAAAAA_wEtANL_YToxOntzOjg6ImZyb21QYWdlIjtzOjE2OiJzZWFyY2hGb3JtV2lkZ2V0Ijt9F_yIfi0AAAA&"
-                "f=ASgBAgECBESSA8gQ8AeQUswIkFngwt3NAq7pDwFFxpoMFXsiZnJvbSI6MCwidG8iOjIwMDAwfQ"
+                "https://www.avito.ru/voronezh/kvartiry/sdam/na_dlitelnyy_srok"
             ),
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
@@ -169,6 +174,28 @@ def _extract_raw_payload_by_external_id(html_text: str) -> dict[str, dict[str, A
                 stack.append(item)
 
     return {external_id: payload for external_id, (_, payload) in payload_by_id.items()}
+
+
+def _parse_cookies_header(cookie_header: str, url: str) -> list[dict[str, str]]:
+    domain = urlparse(url).hostname or "www.avito.ru"
+    cookies: list[dict[str, str]] = []
+    for raw_part in cookie_header.split(";"):
+        part = raw_part.strip()
+        if not part or "=" not in part:
+            continue
+        name, value = part.split("=", 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append(
+            {
+                "name": name,
+                "value": value.strip(),
+                "domain": domain,
+                "path": "/",
+            }
+        )
+    return cookies
 
 
 def _extract_mfe_state(html_text: str) -> dict[str, Any]:

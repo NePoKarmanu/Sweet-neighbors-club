@@ -23,7 +23,7 @@ from backend.services.notifications import (
     delete_push_subscription,
     register_push_subscription,
 )
-from backend.tasks.notifications import run_full_pipeline_task
+from backend.tasks.notifications import run_full_pipeline_task, send_test_push_task
 from backend.utils.auth import get_current_user
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -106,3 +106,17 @@ def get_notifications_pipeline_task_status(
         state=result.state,
         result=payload,
     )
+
+
+@router.post(
+    "/test-push",
+    response_model=NotificationPipelineRunResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary='Queue test push notification with text "привет"',
+)
+def queue_test_push_notification(
+    current_user: User = Depends(get_current_user),
+) -> NotificationPipelineRunResponse:
+    task = send_test_push_task.delay(current_user.id)
+    return NotificationPipelineRunResponse(task_id=task.id, mode="test_push", user_id=current_user.id)
+

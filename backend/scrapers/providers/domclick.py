@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -35,7 +36,7 @@ class DomclickScraper:
             "Accept-Language": "ru,ru-RU;q=0.9,en-US;q=0.8,en;q=0.7",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Cookie": "region={%22data%22:{%22name%22:%22%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6%22%2C%22regionGuid%22:%2270725a3f-da87-4116-a9ca-7bf45cefdfea%22%2C%22localityGuid%22:%22a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1%22%2C%22subdomain%22:%22voronezh%22}%2C%22isAutoResolved%22:true}; canary-bind-id-13626=next-1; qrator_jsid2=v2.0.1778935447.415.bceb14e5R6Q0decP|6e4lo5lEVCxDAq81|K9588EAm8cDT98MGfPt1NPtNXT38kjTlaN0+9HMkJvKUCxMs9WTYxZQM6Dclwah3wFYyAiXYOwlnaYRRCP4ElcMIFSsqU/WbmurGvtnLXCm4H+wSHJPIRgNFoSbd5/+T97pdjahzMrWq/xMR5etl58Qx072D+QbOmw5k5j5ryns=-rFMZcFVog5SctNectNd+9JekSgc=; _sa=SA1.6f8409bc-0e62-4988-98e6-e31562e95d64.1778935452; autoDefinedRegion=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:70725a3f-da87-4116-a9ca-7bf45cefdfea:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6:voronezh; currentLocalityGuid=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1; currentRegionGuid=70725a3f-da87-4116-a9ca-7bf45cefdfea; currentSubDomain=voronezh; dddIntroOnline=false; iosAppLink=; logoSuffix=; max-chat-settings-show={%22countOfEntry%22:4,%22lastStatus%22:%22NOT_CREATED%22}; ns_session=151ee6ce-d769-4eda-9bfe-cabbc78700c4; regionAlert=1; regionName=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6; showDddIntro=false; RETENTION_COOKIES_NAME=ff13b0d735334ee981156ee103428002:9Higo4sMiRk7Z2ShkE3m7lZdFCg; sessionId=05332905c4a6479e90966776111aed93:OvAh8elxGanPglpgmD2t5zFSwuY; UNIQ_SESSION_ID=01f080e1df004abeab8095e7beb83cfc:mduPhVQcAsKm2vSlcyty8tx8rN8; _visitId=eed692ab-8539-47dc-9509-c25a42e1bfd2-8cd1520ebd0d580d; _sas.2c534172f17069dd8844643bb4eb639294cd4a7a61de799648e70dc86bc442b9=SA1.6f8409bc-0e62-4988-98e6-e31562e95d64.1778935452.1778946103; _sas=SA1.6f8409bc-0e62-4988-98e6-e31562e95d64.1778935452.1778946103; project-3518=1318232-1",
+            "Cookie": "region={%22data%22:{%22name%22:%22%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6%22%2C%22regionGuid%22:%2270725a3f-da87-4116-a9ca-7bf45cefdfea%22%2C%22localityGuid%22:%22a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1%22%2C%22subdomain%22:%22voronezh%22}%2C%22isAutoResolved%22:true}; canary-bind-id-14003=prev-0; project-3518=1322660-2; qrator_jsid2=v2.0.1779457256.998.bceb14e54Y94fum1|mMaOwolvCblVevoX|vWwdnqvneRukHGB2H0bdgJHkl+SbHBCy3adRUvKaQVPF5T+RW76JPANz9ZrtvQF9IySKDzQf+MYPBIbABBywDxzhEHBKfcScv8CvO+PdxpU/7ahPFHcEyASSYlt/pu5BvTp2kV99XSIwk2eo0HrOgH7QPblWh32b2rnPOaBm4s8=-JuiKRJvJ51MbT6KQa6f5jx4tdOY=; qrato_jsr=v2.0.1779457256.998.bceb14e54Y94fum1|J2h7SIowwqSZiFMY|ry0VTam9ZvFVmmI0x2Xw89dUx+GWYFGi7jlEEzko8jhKvvHlwSjdJPyG4gKN0nLeK4YJSsVc/kAWnodGk0wrdA==-nNv4Q+AtkG40rAdeWlwBqWHkeY4=-00; qrator_ssid2=v2.0.1779457257.501.bceb14e5RgkWvDey|4qs7XpKqYzyO6D2B|DE68pqHtByV13ciw+GYcXt3nyBGgK0/nRU4/38ekdJzOOIrPiVYP99Eb5MUCWu5uF1tv1sae8O0V+MPBcEbYGQ==-x+as8VCeA5hZT3OnNru+QdgflH8=; _sa=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337; autoDefinedRegion=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:70725a3f-da87-4116-a9ca-7bf45cefdfea:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6:voronezh; currentLocalityGuid=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1; currentRegionGuid=70725a3f-da87-4116-a9ca-7bf45cefdfea; dddIntroOnline=false; iosAppLink=; logoSuffix=; ns_session=38dceb26-8397-43c9-b5f0-27eeac3c8be8; regionName=a7b6f76c-4fa7-41b6-9351-0f3ec1eb4ac1:%D0%92%D0%BE%D1%80%D0%BE%D0%BD%D0%B5%D0%B6; showDddIntro=false; RETENTION_COOKIES_NAME=f26f004736f64300ac9008513702e4df:7SrGsupkIzJAsf55rtYoP5fU2Vw; sessionId=b0eec26838b74f60a48994ea1a0f7da9:Tn3WB1lGZdGovTLiaB4lFt46fVQ; UNIQ_SESSION_ID=fa90fcd39f0c4a41a18d797610d3b941:n2BnZJvbpjL3OdLQhtlYDHme4HQ; _visitId=5e13c2cb-a6bc-43bf-af61-5b1be80c492f-8cd1520ebd0d580d; _sas.2c534172f17069dd8844643bb4eb639294cd4a7a61de799648e70dc86bc442b9=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779457260; _sas=SA1.b19adc10-f975-4211-a310-0622519a4c89.1779441337.1779442361",
             "DNT": "1",
             "Host": "voronezh.domclick.ru",
             "Pragma": "no-cache",
@@ -88,12 +89,18 @@ class DomclickScraper:
 
         parsed_at = datetime.now(timezone.utc)
         city = _extract_city_from_url(self.base_url)
+        dmclk_template = _extract_dmclk_template(html)
         listings: list[ScrapedListingDTO] = []
-        for entity_id in ids:
+        for index, entity_id in enumerate(ids):
             entity = entities.get(str(entity_id))
             if not isinstance(entity, dict):
                 continue
-            listing = self._parse_entity(entity=entity, parsed_at=parsed_at, city=city)
+            listing = self._parse_entity(
+                entity=entity,
+                parsed_at=parsed_at,
+                city=city,
+                dmclk_template=dmclk_template,
+            )
             if listing is not None:
                 listings.append(listing)
 
@@ -107,18 +114,14 @@ class DomclickScraper:
         entity: dict[str, Any],
         parsed_at: datetime,
         city: str | None,
+        dmclk_template: str | None,
     ) -> ScrapedListingDTO | None:
         external_id = _to_string(entity.get("id"))
         path = _to_string(entity.get("path"))
         if external_id is None or path is None:
             return None
 
-        image_url = None
-        photos = entity.get("photos")
-        if isinstance(photos, list) and photos and isinstance(photos[0], dict):
-            image_url = _to_string(photos[0].get("url"))
-            if image_url is not None:
-                image_url = urljoin(self.base_url, image_url)
+        image_url = _build_dmclk_image_url(entity=entity, dmclk_template=dmclk_template)
 
         title = _build_title(entity)
         published_at = _to_datetime(entity.get("publishedDate") or entity.get("updatedDate"))
@@ -208,6 +211,27 @@ def _extract_city_from_url(base_url: str) -> str | None:
         return parts[0]
     return None
 
+def _parse_cookies_header(cookie_header: str, url: str) -> list[dict[str, str]]:
+    domain = urlparse(url).hostname or "voronezh.domclick.ru"
+    cookies: list[dict[str, str]] = []
+    for raw_part in cookie_header.split(";"):
+        part = raw_part.strip()
+        if not part or "=" not in part:
+            continue
+        name, value = part.split("=", 1)
+        name = name.strip()
+        if not name:
+            continue
+        cookies.append(
+            {
+                "name": name,
+                "value": value.strip(),
+                "domain": domain,
+                "path": "/",
+            }
+        )
+    return cookies
+
 
 def _to_string(value: Any) -> str | None:
     if value is None:
@@ -242,7 +266,48 @@ def _to_datetime(value: Any) -> datetime | None:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+    
+def _extract_dmclk_template(html: str) -> str | None:
+    match = re.search(r"https://img\.dmclk\.ru/c960x640q80/[^\"'\s<>]+\.webp", html)
+    if match is None:
+        return None
+    template = match.group(0)
+    marker = "/vitrina/"
+    marker_index = template.find(marker)
+    if marker_index == -1:
+        return None
+    return template[: marker_index + len(marker)] + "{image_path}.webp"
 
+
+def _build_dmclk_image_url(*, entity: dict[str, Any], dmclk_template: str | None) -> str | None:
+    if dmclk_template is None:
+        return None
+    photos = entity.get("photos")
+    if not isinstance(photos, list) or not photos or not isinstance(photos[0], dict):
+        return None
+    
+
+    photo = photos[0]
+    for key in ("url", "fullUrl", "originUrl", "src"):
+        image_path = _extract_dmclk_image_path(photo.get(key))
+        if image_path is None:
+            continue
+        return dmclk_template.format(image_path=image_path)
+    return None
+
+def _extract_dmclk_image_path(value: Any) -> str | None:
+    raw = _to_string(value)
+    if raw is None:
+        return None
+
+    match = re.search(r"(?:^|/)vitrina/(.+?)(?:\.(?:jpg|jpeg|png|webp))?$", raw, flags=re.IGNORECASE)
+    if match is not None:
+        return match.group(1).strip("/") or None
+
+    normalized = raw.strip("/")
+    if not normalized:
+        return None
+    return re.sub(r"\.(jpg|jpeg|png|webp)$", "", normalized, flags=re.IGNORECASE)
 
 def _build_title(entity: dict[str, Any]) -> str:
     object_info = entity.get("objectInfo") if isinstance(entity.get("objectInfo"), dict) else {}

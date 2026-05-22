@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.dialects.postgresql import insert
 
+from backend.db.models.notification_deliveries import NotificationDelivery
 from backend.db.models.notifications import Notification
 from backend.db.repositories.base import BaseRepository
 
@@ -31,11 +32,20 @@ class NotificationRepository(BaseRepository[Notification]):
             return None
         return self.get_by_id(created_notification_id)
 
-    def list_unprocessed(self, *, limit: int) -> list[Notification]:
+    def list_unprocessed(self, *, limit: int, offset: int = 0) -> list[Notification]:
         query = (
             select(Notification)
-            .where(Notification.deleted_at.is_(None))
+            .where(
+                Notification.deleted_at.is_(None),
+                ~exists(
+                    select(1).where(
+                        NotificationDelivery.notification_id == Notification.id,
+                        NotificationDelivery.deleted_at.is_(None),
+                    )
+                ),
+            )
             .order_by(Notification.id.asc())
+            .offset(offset)
             .limit(limit)
         )
         return list(self.session.scalars(query))
