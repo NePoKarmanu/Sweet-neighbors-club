@@ -18,4 +18,5 @@ RUN playwright install --with-deps firefox
 COPY alembic.ini /app/alembic.ini
 COPY backend /app/backend
 
-RUN chmod +x /app/backend/docker/start-api.sh /app/backend/docker/start-worker.sh /app/backend/docker/start-beat.sh
+RUN sed -i 's/\r$//' /app/backend/docker/start-api.sh /app/backend/docker/start-worker.sh /app/backend/docker/start-beat.sh \
+    && chmod +x /app/backend/docker/start-api.sh /app/backend/docker/start-worker.sh /app/backend/docker/start-beat.sh

@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchListings } from '../api/listingsApi';
 import type { ListingListResponse, ListingSearchDTO } from '../types';
 import ListingCard from '../components/ListingCard';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import ErrorMessage from '../components/ui/ErrorMessage';
 import { useAuth } from '../context/AuthContext';
 
 const LIMIT = 6;
@@ -222,8 +224,8 @@ const HomePage: React.FC = () => {
         <button className="btn-reset" onClick={resetFilters}>Сбросить</button>
       </aside>
       <main className="listings-area">
-        {loading && <div className="spinner">Загрузка...</div>}
-        {error && <div className="error-message">{error}</div>}
+        {loading && <LoadingSpinner />}
+        {error && <ErrorMessage message={error} />}
         {!loading && data && (
           <>
             <div className="listings-grid">

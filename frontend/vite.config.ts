@@ -7,26 +7,47 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      manifest: {
-        name: 'Sweet Neighbors Club',
-        short_name: 'SNC',
-        description: 'Риелторские уведомления',
-        theme_color: '#ffffff',
-        icons: [
+      includeAssets: ['favicon.svg', 'icons.svg', '1.png', '2.png'],
+      manifest: false,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        navigateFallback: '/offline.html',
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
           {
-            src: '/1.png',
-            sizes: '192x192',
-            type: 'image/png'
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images-v1',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              }
+            }
           },
           {
-            src: '/2.png',
-            sizes: '512x512',
-            type: 'image/png'
+            urlPattern: ({ request }) => request.destination === 'script' || request.destination === 'style',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'assets-v1'
+            }
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/listing') || url.pathname.startsWith('/notifications'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-runtime-v1',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60
+              }
+            }
           }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+      devOptions: {
+        enabled: false
       }
     })
   ]

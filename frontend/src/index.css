@@ -479,3 +479,30 @@ button[type="submit"]:disabled {
   border-radius: 12px;
   font-size: 0.8rem;
 }
+
+.pwa-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.pwa-banner button {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #fff;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.pwa-banner--success {
+  background: #0f766e;
+}

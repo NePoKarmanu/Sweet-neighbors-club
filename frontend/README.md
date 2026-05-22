@@ -71,3 +71,11 @@ export default defineConfig([
   },
 ])
 ```
+
+
+## Local env for PWA / Push
+
+Create `frontend/.env` (you can copy from `frontend/.env.example`) and define:
+
+- `VITE_API_URL` — backend API URL.
+- `VITE_VAPID_PUBLIC_KEY` — public VAPID key for browser push subscription.

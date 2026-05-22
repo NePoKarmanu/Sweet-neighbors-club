@@ -81,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    window.dispatchEvent(new CustomEvent('auth:logout'));
   }, [token]);
 
   const updateProfile = useCallback(async (email: string, phone: string, newPassword: string, currentPassword: string) => {

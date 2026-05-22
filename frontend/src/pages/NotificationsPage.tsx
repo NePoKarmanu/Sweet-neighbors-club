@@ -1,6 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
 import { useAuth } from '../context/AuthContext';
+import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
 
 const PROPERTY_TYPES_OPTIONS = ['flat', 'room', 'house', 'townhouse', 'apartment'];
 const CREATOR_TYPES_OPTIONS = ['agency', 'owner'];
@@ -49,8 +50,16 @@ const base64UrlToUint8Array = (base64Url: string): Uint8Array => {
   return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
 };
 
+const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+};
+
 const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
+
   const [message, setMessage] = useState('');
   const [city, setCity] = useState(CITY_BACKEND_VALUE);
   const [channels, setChannels] = useState<string[]>([]);
@@ -95,6 +104,47 @@ const NotificationsPage: React.FC = () => {
       setChannels([]);
     }
   }, []);
+  const subscribePushIfNeeded = async (): Promise<void> => {
+    if (!channels.includes('push')) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      throw new Error('Push не поддерживается этим браузером');
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+    if (!vapidPublicKey) {
+      throw new Error('Отсутствует VITE_VAPID_PUBLIC_KEY');
+    }
+
+    const existingSubscription = await registration.pushManager.getSubscription();
+    const pushSubscription =
+      existingSubscription ??
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
+      }));
+
+    const subscriptionJson = pushSubscription.toJSON();
+    const p256dh = subscriptionJson.keys?.p256dh;
+    const auth = subscriptionJson.keys?.auth;
+
+    if (!subscriptionJson.endpoint || !p256dh || !auth) {
+      throw new Error('Не удалось получить данные push-подписки');
+    }
+
+    await createPushSubscription({
+      endpoint: subscriptionJson.endpoint,
+      p256dh,
+      auth,
+      user_agent: navigator.userAgent,
+    });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError('');
+    setMessage('');
 
   const handleSave = async () => {
     const toSave: NotificationSettings = {
@@ -164,6 +214,7 @@ const NotificationsPage: React.FC = () => {
     setHasRepair(undefined);
     localStorage.removeItem(NOTIFY_STORAGE_KEY);
     setMessage('Настройки сброшены');
+    setError('');
   };
 
   const toggleArray = (
@@ -275,6 +326,7 @@ const NotificationsPage: React.FC = () => {
           />
           Электронная почта
         </label>
+
         <label className="checkbox-label">
           <input
             type="checkbox"
@@ -290,46 +342,46 @@ const NotificationsPage: React.FC = () => {
         <div className="filter-group">
           <label>Комнат</label>
           <div className="range-inputs">
-            <input type="number" placeholder="от" value={roomsMin} onChange={e => setRoomsMin(e.target.value)} />
-            <input type="number" placeholder="до" value={roomsMax} onChange={e => setRoomsMax(e.target.value)} />
+            <input type="number" placeholder="от" value={roomsMin} onChange={(e) => setRoomsMin(e.target.value)} />
+            <input type="number" placeholder="до" value={roomsMax} onChange={(e) => setRoomsMax(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-group">
           <label>Цена, ₽</label>
           <div className="range-inputs">
-            <input type="number" placeholder="от" value={priceMin} onChange={e => setPriceMin(e.target.value)} />
-            <input type="number" placeholder="до" value={priceMax} onChange={e => setPriceMax(e.target.value)} />
+            <input type="number" placeholder="от" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} />
+            <input type="number" placeholder="до" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-group">
           <label>Площадь, м²</label>
           <div className="range-inputs">
-            <input type="number" placeholder="от" value={areaMin} onChange={e => setAreaMin(e.target.value)} />
-            <input type="number" placeholder="до" value={areaMax} onChange={e => setAreaMax(e.target.value)} />
+            <input type="number" placeholder="от" value={areaMin} onChange={(e) => setAreaMin(e.target.value)} />
+            <input type="number" placeholder="до" value={areaMax} onChange={(e) => setAreaMax(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-group">
           <label>Этаж</label>
           <div className="range-inputs">
-            <input type="number" placeholder="от" value={floorMin} onChange={e => setFloorMin(e.target.value)} />
-            <input type="number" placeholder="до" value={floorMax} onChange={e => setFloorMax(e.target.value)} />
+            <input type="number" placeholder="от" value={floorMin} onChange={(e) => setFloorMin(e.target.value)} />
+            <input type="number" placeholder="до" value={floorMax} onChange={(e) => setFloorMax(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-group">
           <label>Год постройки</label>
           <div className="range-inputs">
-            <input type="number" placeholder="от" value={buildYearMin} onChange={e => setBuildYearMin(e.target.value)} />
-            <input type="number" placeholder="до" value={buildYearMax} onChange={e => setBuildYearMax(e.target.value)} />
+            <input type="number" placeholder="от" value={buildYearMin} onChange={(e) => setBuildYearMin(e.target.value)} />
+            <input type="number" placeholder="до" value={buildYearMax} onChange={(e) => setBuildYearMax(e.target.value)} />
           </div>
         </div>
 
         <div className="filter-group">
           <label>Тип недвижимости</label>
-          {PROPERTY_TYPES_OPTIONS.map(type => (
+            {PROPERTY_TYPES_OPTIONS.map((type) => (
             <label key={type} className="checkbox-label">
               <input
                 type="checkbox"
@@ -343,7 +395,7 @@ const NotificationsPage: React.FC = () => {
 
         <div className="filter-group">
           <label>Продавец</label>
-          {CREATOR_TYPES_OPTIONS.map(type => (
+           {CREATOR_TYPES_OPTIONS.map((type) => (
             <label key={type} className="checkbox-label">
               <input
                 type="checkbox"
@@ -359,15 +411,30 @@ const NotificationsPage: React.FC = () => {
           <label>Ремонт</label>
           <div className="radio-group">
             <label className="checkbox-label">
-              <input type="radio" name="notify_repair" checked={hasRepair === undefined} onChange={() => setHasRepair(undefined)} />
+          <input
+                type="radio"
+                name="notify_repair"
+                checked={hasRepair === undefined}
+                onChange={() => setHasRepair(undefined)}
+              />
               Любой
             </label>
             <label className="checkbox-label">
-              <input type="radio" name="notify_repair" checked={hasRepair === true} onChange={() => setHasRepair(true)} />
+          <input
+                type="radio"
+                name="notify_repair"
+                checked={hasRepair === true}
+                onChange={() => setHasRepair(true)}
+              />
               С ремонтом
             </label>
             <label className="checkbox-label">
-              <input type="radio" name="notify_repair" checked={hasRepair === false} onChange={() => setHasRepair(false)} />
+          <input
+                type="radio"
+                name="notify_repair"
+                checked={hasRepair === false}
+                onChange={() => setHasRepair(false)}
+              />
               Без ремонта
             </label>
           </div>
@@ -375,8 +442,12 @@ const NotificationsPage: React.FC = () => {
       </section>
 
       <div style={{ marginTop: '20px' }}>
-        <button className="btn-apply" onClick={handleSave}>Сохранить настройки</button>
-        <button className="btn-reset" onClick={handleReset}>Сбросить</button>
+          <button className="btn-apply" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? 'Сохранение...' : 'Сохранить настройки'}
+        </button>
+        <button className="btn-reset" onClick={handleReset} disabled={isSaving}>
+          Сбросить
+        </button>
       </div>
 
       {message && <p style={{ marginTop: '1rem', textAlign: 'center', color: '#2e7d32' }}>{message}</p>}
