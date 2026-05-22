@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -16,8 +17,11 @@ from backend.db.repositories.push_subscriptions import PushSubscriptionRepositor
 from backend.db.repositories.search_filters import SearchFilterRepository
 from backend.db.repositories.sent_listings import SentListingRepository
 from backend.db.repositories.users import UserRepository
+from backend.logging_utils import log_exception, log_info, log_warning
 from backend.services.deliveries.email_sender import EmailSender
 from backend.services.deliveries.push_sender import PushSender, WebPushException
+
+logger = logging.getLogger(__name__)
 
 
 def _fits_range(value: float | int | None, minimum: float | int | None, maximum: float | int | None) -> bool:
@@ -183,6 +187,10 @@ def process_pending_deliveries(
 
     deliveries = delivery_repository.list_pending(limit=batch_size)
     if not deliveries:
+        log_info(
+            logger, "No pending deliveries found", event="notifications.pending_deliveries_empty",
+            processed=0, user_id=user_id
+        )
         return 0
 
     now = datetime.now(timezone.utc)
@@ -191,6 +199,10 @@ def process_pending_deliveries(
         delivery_repository=delivery_repository,
         notification_repository=notification_repository,
         user_id=user_id,
+    )
+    log_info(
+        logger, "Delivery groups prepared", event="notifications.delivery_groups_prepared",
+        pending=len(deliveries), groups=len(grouped_deliveries), user_id=user_id
     )
 
     notifications_by_id, listings_by_id, users_by_id, active_push_subscriptions_by_user_id = _build_delivery_context(
@@ -230,6 +242,10 @@ def process_pending_deliveries(
         delivery_repository.flush()
         delivery_repository.commit()
 
+    log_info(
+        logger, "Pending deliveries processing finished", event="notifications.pending_deliveries_processed",
+        processed=processed, user_id=user_id
+    )
     return processed
 
 def _group_deliveries(
@@ -247,6 +263,11 @@ def _group_deliveries(
     for delivery in deliveries:
         notification = notifications_by_id.get(delivery.notification_id)
         if notification is None:
+            log_warning(
+                logger, "Delivery marked as failed because notification is missing",
+                event="notifications.delivery_failed_missing_notification",
+                channel=getattr(delivery.channel, "value", str(delivery.channel))
+            )
             delivery_repository.mark_failed(delivery=delivery, error_message="Notification is missing")
             continue
         if user_id is not None and notification.user_id != user_id:
@@ -293,24 +314,48 @@ def _process_delivery_group(
     processed = 0
     pending_changes = 0
     failed_push_endpoint: str | None = None
+    deliveries_count = len(group)
     try:
         user = users_by_id.get(target_user_id)
         if user is None:
+            log_warning(
+                logger, "Delivery group failed because user is missing",
+                event="notifications.delivery_failed_missing_user",
+                user_id=target_user_id, channel=channel.value, deliveries_count=deliveries_count
+            )
             return _mark_group_failed(group=group, delivery_repository=delivery_repository, error_message="User is missing")
 
         listings_payload = _collect_listings_payload(group=group, listings_by_id=listings_by_id)
         if listings_payload is None:
+            log_warning(
+                logger, "Delivery group failed because listing is missing",
+                event="notifications.delivery_failed_missing_listing",
+                user_id=target_user_id, channel=channel.value, deliveries_count=deliveries_count
+            )
             return _mark_group_failed(group=group, delivery_repository=delivery_repository, error_message="Listing is missing")
 
         listing_messages = [(title, url, price) for title, url, price, _ in listings_payload]
+        log_info(
+            logger, "Delivery group send attempt", event="notifications.delivery_send_attempt",
+            user_id=target_user_id, channel=channel.value,
+            deliveries_count=deliveries_count, listings_count=len(listing_messages)
+        )
         if channel == NotificationChannel.email:
-            email_sender.send_many(recipient=user.email, listings=listing_messages)
+            email_sender.send_many(
+                recipient=user.email,
+                listings=listing_messages,
+                user_id=target_user_id,
+            )
         else:
             push_subscription = active_push_subscriptions_by_user_id.get(user.id)
             if push_subscription is None:
                 raise RuntimeError("No active push subscription")
             failed_push_endpoint = push_subscription.endpoint
-            push_sender.send_many(push_subscription=push_subscription, listings=listing_messages)
+            push_sender.send_many(
+                push_subscription=push_subscription,
+                listings=listing_messages,
+                user_id=target_user_id,
+            )
 
         for delivery, _ in group:
             delivery_repository.mark_sent(delivery=delivery, sent_at=now)
@@ -319,11 +364,27 @@ def _process_delivery_group(
         for _, _, _, listing_id in listings_payload:
             sent_listing_repository.create_if_missing(user_id=user.id, listing_id=listing_id, sent_at=now)
             pending_changes += 1
+        log_info(
+            logger, "Delivery group sent successfully", event="notifications.delivery_send_success",
+            user_id=target_user_id, channel=channel.value, deliveries_count=deliveries_count,
+            listings_count=len(listing_messages), processed=processed
+        )
     except WebPushException as exc:
         delivery_repository.rollback()
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        deactivated_subscription = False
         if status_code in {404, 410} and failed_push_endpoint is not None:
             push_repository.deactivate_by_endpoint(endpoint=failed_push_endpoint)
+            deactivated_subscription = True
+        log_warning(
+            logger, "Web push delivery group failed", event="notifications.delivery_send_webpush_failed",
+            user_id=target_user_id, channel=channel.value, deliveries_count=deliveries_count,
+            status_code=status_code, deactivated_subscription=deactivated_subscription
+        )
+        log_exception(
+            logger, "Web push delivery exception", event="notifications.delivery_send_failed",
+            user_id=target_user_id, channel=channel.value
+        )
         processed_delta, pending_changes_delta = _mark_group_failed(
             group=group,
             delivery_repository=delivery_repository,
@@ -332,6 +393,10 @@ def _process_delivery_group(
         processed += processed_delta
         pending_changes += pending_changes_delta
     except Exception as exc:
+        log_exception(
+            logger, "Delivery group failed", event="notifications.delivery_send_failed",
+            user_id=target_user_id, channel=channel.value, deliveries_count=deliveries_count
+        )
         processed_delta, pending_changes_delta = _mark_group_failed(
             group=group,
             delivery_repository=delivery_repository,

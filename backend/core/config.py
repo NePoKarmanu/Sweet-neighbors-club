@@ -6,6 +6,8 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     REDIS_URL: str = "redis://localhost:6379/0"
+    LISTING_CACHE_ENABLED: bool = True
+    LISTING_CACHE_TTL_SECONDS: int = 600
     CELERY_BROKER_URL: str | None = None
     CELERY_RESULT_BACKEND: str | None = None
     CELERY_RESULT_EXPIRES_SECONDS: int = 3600
