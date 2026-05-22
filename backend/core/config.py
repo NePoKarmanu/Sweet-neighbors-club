@@ -24,8 +24,6 @@ class Settings(BaseSettings):
     CIAN_USER_AGENT: str | None = None
     AVITO_SEARCH_URL: str = (
         "https://www.avito.ru/voronezh/kvartiry/sdam/na_dlitelnyy_srok-ASgBAgICAkSSA8gQ8AeQUg"
-        "?context=H4sIAAAAAAAA_wFNALL_YToyOntzOjg6ImZyb21QYWdlIjtzOjE2OiJzZWFyY2hGb3JtV2lkZ2V0"
-        "IjtzOjE6InkiO3M6MTY6IkIxcnJGUDhOaVhlajNSeXAiO30ricE8TQAAAA&localPriority=0"
     )
     AVITO_REQUEST_TIMEOUT_SECONDS: int = 20
     AVITO_COOKIE: str | None = None

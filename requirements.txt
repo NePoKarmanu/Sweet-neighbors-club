@@ -8,6 +8,7 @@ PyJWT
 pydantic
 pydantic-settings
 httpx
+playwright
 celery
 redis
 pywebpush
