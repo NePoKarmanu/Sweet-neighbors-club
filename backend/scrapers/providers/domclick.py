@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -88,12 +89,18 @@ class DomclickScraper:
 
         parsed_at = datetime.now(timezone.utc)
         city = _extract_city_from_url(self.base_url)
+        dmclk_template = _extract_dmclk_template(html)
         listings: list[ScrapedListingDTO] = []
-        for entity_id in ids:
+        for index, entity_id in enumerate(ids):
             entity = entities.get(str(entity_id))
             if not isinstance(entity, dict):
                 continue
-            listing = self._parse_entity(entity=entity, parsed_at=parsed_at, city=city)
+            listing = self._parse_entity(
+                entity=entity,
+                parsed_at=parsed_at,
+                city=city,
+                dmclk_template=dmclk_template,
+            )
             if listing is not None:
                 listings.append(listing)
 
@@ -107,18 +114,17 @@ class DomclickScraper:
         entity: dict[str, Any],
         parsed_at: datetime,
         city: str | None,
+        dmclk_template: str | None,
     ) -> ScrapedListingDTO | None:
         external_id = _to_string(entity.get("id"))
         path = _to_string(entity.get("path"))
         if external_id is None or path is None:
             return None
 
-        image_url = None
-        photos = entity.get("photos")
-        if isinstance(photos, list) and photos and isinstance(photos[0], dict):
-            image_url = _to_string(photos[0].get("url"))
-            if image_url is not None:
-                image_url = urljoin(self.base_url, image_url)
+        image_url = _build_dmclk_image_url(entity=entity, dmclk_template=dmclk_template) or _extract_image_url(
+            entity=entity,
+            base_url=self.base_url,
+        )
 
         title = _build_title(entity)
         published_at = _to_datetime(entity.get("publishedDate") or entity.get("updatedDate"))
@@ -242,7 +248,47 @@ def _to_datetime(value: Any) -> datetime | None:
         return datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+    
+def _extract_dmclk_template(html: str) -> str | None:
+    match = re.search(r"https://img\.dmclk\.ru/c960x640q80/[^\"'\s<>]+\.webp", html)
+    if match is None:
+        return None
+    template = match.group(0)
+    marker = "/vitrina/"
+    marker_index = template.find(marker)
+    if marker_index == -1:
+        return None
+    return template[: marker_index + len(marker)] + "{image_path}.webp"
 
+
+def _build_dmclk_image_url(*, entity: dict[str, Any], dmclk_template: str | None) -> str | None:
+    if dmclk_template is None:
+        return None
+    photos = entity.get("photos")
+    if not isinstance(photos, list) or not photos or not isinstance(photos[0], dict):
+        return None
+    raw_url = _to_string(photos[0].get("url"))
+    if raw_url is None:
+        return None
+    normalized = raw_url.strip("/")
+    if not normalized:
+        return None
+    image_path = re.sub(r"\.(jpg|jpeg|png|webp)$", "", normalized, flags=re.IGNORECASE)
+    return dmclk_template.format(image_path=image_path)
+
+
+def _extract_image_url(*, entity: dict[str, Any], base_url: str) -> str | None:
+    photos = entity.get("photos")
+    if not isinstance(photos, list) or not photos or not isinstance(photos[0], dict):
+        return None
+
+    photo = photos[0]
+    for key in ("url", "fullUrl", "originUrl", "src"):
+        image_url = _to_string(photo.get(key))
+        if image_url is None:
+            continue
+        return urljoin(base_url, image_url)
+    return None
 
 def _build_title(entity: dict[str, Any]) -> str:
     object_info = entity.get("objectInfo") if isinstance(entity.get("objectInfo"), dict) else {}

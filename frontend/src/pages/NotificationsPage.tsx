@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { createNotificationSettings } from '../api/notificationsApi';
+import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
 import { useAuth } from '../context/AuthContext';
 
 const PROPERTY_TYPES_OPTIONS = ['flat', 'room', 'house', 'townhouse', 'apartment'];
@@ -39,6 +39,15 @@ interface NotificationSettings {
 const NOTIFY_STORAGE_KEY = 'notification_settings';
 const CITY_LABEL = 'Воронеж';
 const CITY_BACKEND_VALUE = 'voronezh';
+
+const PUSH_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
+const base64UrlToUint8Array = (base64Url: string): Uint8Array => {
+  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+};
 
 const NotificationsPage: React.FC = () => {
   const { user } = useAuth();
@@ -175,9 +184,40 @@ const NotificationsPage: React.FC = () => {
         alert('Браузер не поддерживает уведомления');
         return;
       }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('Push-уведомления не поддерживаются в этом браузере');
+        return;
+      }
+      if (!PUSH_PUBLIC_KEY) {
+        alert('VAPID public key не настроен');
+        return;
+      }
 
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          const pushSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: base64UrlToUint8Array(PUSH_PUBLIC_KEY) as BufferSource,
+          });
+          const key = pushSubscription.getKey('p256dh');
+          const auth = pushSubscription.getKey('auth');
+          if (!key || !auth) {
+            alert('Не удалось получить push ключи подписки');
+            return;
+          }
+
+          await createPushSubscription({
+            endpoint: pushSubscription.endpoint,
+            p256dh: btoa(String.fromCharCode(...new Uint8Array(key))),
+            auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
+            user_agent: navigator.userAgent,
+          });
+        } catch {
+          alert('Не удалось зарегистрировать push-подписку');
+          return;
+        }
         setChannels(prev => [...prev, 'push']);
       } else {
         alert('Разрешение не получено');

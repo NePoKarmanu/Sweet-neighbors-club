@@ -51,8 +51,8 @@ class AvitoScraper:
         except (PlaywrightTimeoutError, PlaywrightError) as exc:
             raise ScraperRequestError(f"Avito request failed: {exc}") from exc
 
-        if self._looks_like_captcha(html_text):
-            raise ScraperRequestError("Avito returned captcha page")
+        #if self._looks_like_captcha(html_text):
+            #raise ScraperRequestError("Avito returned captcha page")
 
         return self.parse(html_text)
 
