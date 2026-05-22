@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { validateEmail, validatePassword, validatePhone } from '../hooks/useValidation';
+import ErrorMessage from '../components/ui/ErrorMessage';
 
 const SignupPage = () => {
   const { register } = useAuth();
@@ -84,7 +85,7 @@ const SignupPage = () => {
           {errors.confirmPassword && <span className="error">{errors.confirmPassword}</span>}
         </div>
 
-        {serverError && <div className="server-error">{serverError}</div>}
+        {serverError && <ErrorMessage message={serverError} />}
 
         <button type="submit" disabled={isLoading}>
           {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
