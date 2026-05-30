@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { createNotificationSettings, createPushSubscription } from '../api/notificationsApi';
+import { useAuth } from '../context/AuthContext';
+
 
 const PROPERTY_TYPES_OPTIONS = ['flat', 'room', 'house', 'townhouse', 'apartment'];
 const CREATOR_TYPES_OPTIONS = ['agency', 'owner'];
