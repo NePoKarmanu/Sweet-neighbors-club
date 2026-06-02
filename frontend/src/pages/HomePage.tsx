@@ -11,16 +11,12 @@ const LIMIT = 6;
 
 const PROPERTY_TYPES_OPTIONS = ['flat', 'room', 'house', 'townhouse', 'apartment'];
 const CREATOR_TYPES_OPTIONS = ['agency', 'owner'];
-const LIVING_CONDITIONS_OPTIONS = ['mortgage', 'maternal_capital', 'bargain', 'exchange'];
 
 const PROPERTY_LABELS: Record<string, string> = {
   flat: 'Квартира', room: 'Комната', house: 'Дом', townhouse: 'Таунхаус', apartment: 'Апартаменты',
 };
 const CREATOR_LABELS: Record<string, string> = {
   agency: 'Агентство', owner: 'Собственник',
-};
-const LIVING_CONDITIONS_LABELS: Record<string, string> = {
-  mortgage: 'Ипотека', maternal_capital: 'Маткапитал', bargain: 'Торг', exchange: 'Обмен',
 };
 
 const HomePage: React.FC = () => {
@@ -45,7 +41,6 @@ const HomePage: React.FC = () => {
   const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>([]);
   const [selectedCreatorTypes, setSelectedCreatorTypes] = useState<string[]>([]);
   const [hasRepair, setHasRepair] = useState<boolean | undefined>(undefined);
-  const [selectedLivingConditions, setSelectedLivingConditions] = useState<string[]>([]);
 
   const buildFilters = (): ListingSearchDTO => {
     const result: ListingSearchDTO = {};
@@ -66,7 +61,6 @@ const HomePage: React.FC = () => {
     }
     if (selectedPropertyTypes.length) result.property_types = selectedPropertyTypes;
     if (selectedCreatorTypes.length) result.creator_types = selectedCreatorTypes as ('agency' | 'owner')[];
-    if (selectedLivingConditions.length) result.living_conditions = selectedLivingConditions;
     if (hasRepair !== undefined) result.has_repair = hasRepair;
     return result;
   };
@@ -89,7 +83,7 @@ const HomePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, roomsMin, roomsMax, priceMin, priceMax, areaMin, areaMax, floorMin, floorMax, buildYearMin, buildYearMax, selectedPropertyTypes, selectedCreatorTypes, hasRepair, selectedLivingConditions]);
+  }, [user, roomsMin, roomsMax, priceMin, priceMax, areaMin, areaMax, floorMin, floorMax, buildYearMin, buildYearMax, selectedPropertyTypes, selectedCreatorTypes, hasRepair]);
 
   useEffect(() => {
     if (user) load(0);
@@ -109,7 +103,6 @@ const HomePage: React.FC = () => {
     setSelectedPropertyTypes([]);
     setSelectedCreatorTypes([]);
     setHasRepair(undefined);
-    setSelectedLivingConditions([]);
     setOffset(0);
     load(0);
   };
@@ -209,16 +202,6 @@ const HomePage: React.FC = () => {
               Без ремонта
             </label>
           </div>
-        </div>
-        <div className="filter-group">
-          <label>Условия</label>
-          {LIVING_CONDITIONS_OPTIONS.map(cond => (
-            <label key={cond} className="checkbox-label">
-              <input type="checkbox" checked={selectedLivingConditions.includes(cond)}
-                onChange={() => toggleArrayFilter(cond, selectedLivingConditions, setSelectedLivingConditions)} />
-              {LIVING_CONDITIONS_LABELS[cond]}
-            </label>
-          ))}
         </div>
         <button className="btn-apply" onClick={applyFilters}>Применить</button>
         <button className="btn-reset" onClick={resetFilters}>Сбросить</button>

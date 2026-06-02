@@ -258,7 +258,7 @@ const NotificationsPage: React.FC = () => {
         <h2>Город</h2>
         <div className="filter-group">
           <label htmlFor="notifications-city">Выберите город</label>
-          <select id="notifications-city" value={city} onChange={e => setCity(e.target.value)}>
+          <select id="notifications-city" className="city-select" value={city} onChange={e => setCity(e.target.value)}>
             <option value={CITY_BACKEND_VALUE}>{CITY_LABEL}</option>
           </select>
         </div>
