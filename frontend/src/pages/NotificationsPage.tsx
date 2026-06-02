@@ -251,7 +251,7 @@ const NotificationsPage: React.FC = () => {
   }
 
   return (
-    <div className="form-page" style={{ maxWidth: '500px', margin: '30px auto', padding: '20px' }}>
+    <div className="form-page notifications-page">
       <h1>Настройки уведомлений</h1>
 
       <section>
